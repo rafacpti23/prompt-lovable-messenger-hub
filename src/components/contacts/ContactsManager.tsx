@@ -1,4 +1,5 @@
-import React from "react";
+
+import React, { useEffect } from "react";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,45 +8,45 @@ import { Badge } from "@/components/ui/badge";
 import { Users, Plus, Search, Trash2, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import GroupSelector from "./GroupSelector";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Contact {
-  id: number;
+  id: string; // Agora UUID
   name: string;
   phone: string;
   group: string;
+  created_at?: string;
+  [key: string]: any;
 }
 interface ContactsManagerProps {
   contacts: Contact[];
   setContacts: React.Dispatch<React.SetStateAction<Contact[]>>;
   groups: string[];
+  loading?: boolean;
+  user?: any;
 }
-const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts, groups }) => {
+const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts, groups, loading, user }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [newContact, setNewContact] = useState({ name: "", phone: "", group: "" });
   const { toast } = useToast();
 
-  // Não precisamos mais do estado local groups, pois agora vem via props do pai
-
   const filteredContacts = contacts.filter(contact =>
-    contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.phone.includes(searchTerm) ||
-    contact.group.toLowerCase().includes(searchTerm.toLowerCase())
+    contact.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    contact.phone?.includes(searchTerm) ||
+    contact.group?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleCreateGroup = (group: string) => {
-    // Se já existe, só seleciona.
     if (groups.includes(group)) {
       setNewContact(c => ({ ...c, group }));
       toast({ title: "Grupo já existe", description: `Grupo '${group}' já está disponível.` });
       return;
     }
-    // cria um contato temporário só com o grupo, para forçar derivação
     setNewContact(c => ({ ...c, group }));
     toast({ title: "Grupo criado", description: `Grupo '${group}' foi adicionado.` });
-    // Opcionalmente criaremos (como melhoria futura) um comando para apenas adicionar grupos sem contato.
   };
 
-  const addContact = () => {
+  const addContact = async () => {
     if (!newContact.name || !newContact.phone) {
       toast({
         title: "Erro",
@@ -62,22 +63,39 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
       });
       return;
     }
+    if (!user) {
+      toast({ title: "Erro", description: "Não autenticado", variant: "destructive" });
+      return;
+    }
 
-    const contact = {
-      id: Date.now(),
-      ...newContact
+    // Insere contato no Supabase
+    const insertObj = {
+      user_id: user.id,
+      name: newContact.name,
+      phone: newContact.phone,
+      group: newContact.group,
     };
 
-    setContacts([...contacts, contact]);
+    const { data, error } = await supabase.from("contacts").insert([insertObj]).select().single();
+    if (error) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    setContacts([data, ...contacts]);
     setNewContact({ name: "", phone: "", group: "" });
-    
     toast({
       title: "Contato adicionado",
       description: `${newContact.name} foi adicionado à lista`,
     });
   };
 
-  const deleteContact = (id: number) => {
+  const deleteContact = async (id: string) => {
+    const { error } = await supabase.from("contacts").delete().eq("id", id);
+    if (error) {
+      toast({ title: "Erro ao remover contato", description: error.message, variant: "destructive" });
+      return;
+    }
     setContacts(contacts.filter(contact => contact.id !== id));
     toast({
       title: "Contato removido",
@@ -93,7 +111,6 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
           <h2 className="text-2xl font-bold text-gray-900">Gerenciar Contatos</h2>
         </div>
       </div>
-
       {/* Adicionar Contato */}
       <Card>
         <CardHeader>
@@ -158,6 +175,12 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
           <CardTitle>Contatos ({filteredContacts.length})</CardTitle>
         </CardHeader>
         <CardContent>
+          {loading ? (
+            <div className="text-center py-8 text-gray-500 animate-pulse">
+              <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+              <p>Carregando contatos...</p>
+            </div>
+          ) : (
           <div className="space-y-3">
             {filteredContacts.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
@@ -190,6 +213,7 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
               ))
             )}
           </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -197,3 +221,4 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
 };
 
 export default ContactsManager;
+

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,21 +18,10 @@ const MainApp = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showSettings, setShowSettings] = useState(false);
 
+  // ======================== CONTATOS ========================
   // Estado centralizado para contatos e grupos
-  const [contacts, setContacts] = useState([
-    {
-      id: 1,
-      name: "João Silva",
-      phone: "+55 11 99999-1234",
-      group: "Clientes"
-    },
-    {
-      id: 2,
-      name: "Maria Santos",
-      phone: "+55 11 99999-5678",
-      group: "Prospects"
-    }
-  ]);
+  const [contacts, setContacts] = useState<any[]>([]);
+  const [loadingContacts, setLoadingContacts] = useState(true);
 
   // Derivar os grupos únicos dos contatos
   const groups = Array.from(new Set(contacts.map(c => c.group).filter(Boolean)));
@@ -49,6 +38,22 @@ const MainApp = () => {
     console.error("Erro no useAuth:", e);
     contextError = e;
   }
+
+  // Carregar contatos reais do Supabase
+  useEffect(() => {
+    async function fetchContacts() {
+      setLoadingContacts(true);
+      if (!user) return;
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (!error) setContacts(data || []);
+      setLoadingContacts(false);
+    }
+    if (user) fetchContacts();
+  }, [user]);
 
   if (contextError) {
     return (
@@ -163,6 +168,8 @@ const MainApp = () => {
               contacts={contacts}
               setContacts={setContacts}
               groups={groups}
+              loading={loadingContacts}
+              user={user}
             />
           </TabsContent>
 
