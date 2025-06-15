@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Send, Plus, Play, Pause, Trash2 } from "lucide-react";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
 const GOOGLE_STORAGE_KEY = "googleContactsSheetId";
@@ -36,7 +37,12 @@ const CampaignsManager = () => {
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
   const [recurringInterval, setRecurringInterval] = useState<number>(7);
+  const [selectedGroup, setSelectedGroup] = useState("Todos os contatos");
   const { toast } = useToast();
+
+  // Grupos simulados para Supabase e Google Sheets
+  const supabaseGroups = ["Todos os contatos", "Clientes", "Prospects", "VIP"];
+  const googleSheetGroups = ["Todos os contatos", "Ativos", "Leads", "Pós-venda"];
 
   // simulação: efeito para recuperar do localStorage a planilha do usuário
   useEffect(() => {
@@ -77,6 +83,7 @@ const CampaignsManager = () => {
       sent: 0,
       total: 0,
       contactSource,
+      group: selectedGroup,
       schedule: {
         type: scheduleType,
         date: scheduleDate,
@@ -88,7 +95,8 @@ const CampaignsManager = () => {
 
     setCampaigns([...campaigns, campaign]);
     setNewCampaign({ name: "", message: "" });
-    
+    setSelectedGroup("Todos os contatos");
+
     toast({
       title: "Campanha criada",
       description: `Campanha ${newCampaign.name} criada com sucesso`,
@@ -204,6 +212,26 @@ const CampaignsManager = () => {
                   )}
                 </div>
               )}
+            </div>
+
+            {/* Grupo de contatos */}
+            <div>
+              <label className="block font-medium mb-2">Grupo de contatos:</label>
+              <Select
+                value={selectedGroup}
+                onValueChange={setSelectedGroup}
+              >
+                <SelectTrigger className="w-60">
+                  <SelectValue placeholder="Selecione grupo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(contactSource === "supabase" ? supabaseGroups : googleSheetGroups).map((group) => (
+                    <SelectItem key={group} value={group}>
+                      {group}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Nome e mensagem da campanha */}
