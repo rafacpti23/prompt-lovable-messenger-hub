@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Send } from "lucide-react";
 import CampaignForm from "./CampaignForm";
@@ -16,8 +15,8 @@ interface CampaignDB {
   created_at?: string;
   // Os campos `sent` e `total` não existem no banco,
   // mas são exigidos pelo CampaignList como parte da tipagem `Campaign`.
-  sent?: number;
-  total?: number;
+  sent: number; // Agora obrigatório
+  total: number; // Agora obrigatório
 }
 
 interface CampaignsManagerProps {
