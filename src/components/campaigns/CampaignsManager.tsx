@@ -244,6 +244,30 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     }
   };
 
+  // NOVA FUNÇÃO: Iniciar campanha (atualiza status para "active")
+  const startCampaign = async (id: string) => {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { error } = await supabase
+      .from("campaigns")
+      .update({ status: "active" })
+      .eq("id", id);
+    if (error) {
+      toast({
+        title: "Erro ao iniciar campanha",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+    setCampaigns((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, status: "active" } : c))
+    );
+    toast({
+      title: "Campanha iniciada",
+      description: "A campanha foi marcada como ativa. O disparo será feito conforme agendamento.",
+    });
+  };
+
   // Copiado/Adaptado para exibir o status EXATO da instância ao selecionar campanha
   return (
     <div className="space-y-6">
@@ -285,6 +309,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         deleteCampaign={deleteCampaign}
         getStatusColor={getStatusColor}
         getStatusText={getStatusText}
+        onStartCampaign={startCampaign}  // <--- PASSAMOS AQUI!
       />
     </div>
   );

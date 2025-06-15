@@ -16,9 +16,10 @@ interface Campaign {
 
 interface CampaignListProps {
   campaigns: Campaign[];
-  deleteCampaign: (id: string) => void;  // Correction: id is string
+  deleteCampaign: (id: string) => void;
   getStatusColor: (status: string) => string;
   getStatusText: (status: string) => string;
+  onStartCampaign?: (id: string) => void;
 }
 
 const CampaignList: React.FC<CampaignListProps> = ({
@@ -26,6 +27,7 @@ const CampaignList: React.FC<CampaignListProps> = ({
   deleteCampaign,
   getStatusColor,
   getStatusText,
+  onStartCampaign,
 }) => {
   return (
     <div className="grid gap-4">
@@ -50,19 +52,23 @@ const CampaignList: React.FC<CampaignListProps> = ({
               </div>
               <div className="flex items-center space-x-2">
                 {campaign.status === "draft" && (
-                  <Button variant="outline" size="sm">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onStartCampaign?.(campaign.id)}
+                  >
                     <Play className="h-4 w-4 mr-2" />
                     Iniciar
                   </Button>
                 )}
                 {campaign.status === "active" && (
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" disabled>
                     <Pause className="h-4 w-4 mr-2" />
                     Pausar
                   </Button>
                 )}
                 {campaign.status === "paused" && (
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" disabled>
                     <Play className="h-4 w-4 mr-2" />
                     Retomar
                   </Button>
