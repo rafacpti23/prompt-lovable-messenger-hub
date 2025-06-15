@@ -1,9 +1,10 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, Users, Send, BarChart3, Plus, Settings, Calendar } from "lucide-react";
+import { MessageSquare, Users, Send, BarChart3, Settings } from "lucide-react";
 import { useAuth, AuthProvider } from "@/components/auth/AuthProvider";
 import LoginForm from "@/components/auth/LoginForm";
 import Dashboard from "@/components/dashboard/Dashboard";
@@ -15,19 +16,62 @@ import SettingsModal from "@/components/settings/SettingsModal";
 const MainApp = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showSettings, setShowSettings] = useState(false);
-  const { user, signOut, isLoading } = useAuth();
+
+  let user, signOut, isLoading, error;
+  let contextError = null;
+  try {
+    // console log para debugar o hook
+    const auth = useAuth();
+    user = auth.user;
+    signOut = auth.signOut;
+    isLoading = auth.isLoading;
+    // Forçar log sempre que o estado do auth mudar
+    console.log("Auth info", { user, isLoading });
+  } catch (e) {
+    console.error("Erro no useAuth:", e);
+    contextError = e;
+  }
+
+  if (contextError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-red-100 flex-col">
+        <div className="text-2xl font-bold text-red-700 mb-4">Erro crítico no carregamento</div>
+        <div className="bg-white px-6 py-4 rounded">{String(contextError.message || contextError)}</div>
+        <div className="text-gray-500 text-sm mt-2">
+          Verifique se todos os arquivos existem e se não há erros nos imports.
+        </div>
+      </div>
+    );
+  }
+
+  if (typeof isLoading === "undefined") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-blue-50">
+        <div className="text-lg text-blue-700 bg-white px-10 py-6 rounded shadow">
+          <div className="font-bold text-2xl">Carregando...</div>
+          <div className="text-sm mt-2">Inicializando componentes.</div>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-blue-50">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+        <span className="ml-4 text-lg text-green-800">Carregando autenticação...</span>
       </div>
     );
   }
 
   if (!user) {
+    // Debug do auth para login
+    console.log("Nenhum usuário autenticado. Exibindo tela de login.");
     return <LoginForm />;
   }
+
+  // Debug de usuário autenticado
+  console.log("Usuário autenticado:", user);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50">
@@ -117,6 +161,8 @@ const MainApp = () => {
 };
 
 const Index = () => {
+  // Console log assim que entrar na página inicial
+  console.log("Renderizando Index.tsx");
   return (
     <AuthProvider>
       <MainApp />
