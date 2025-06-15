@@ -275,11 +275,10 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         setScheduleTime={setScheduleTime}
         recurringInterval={recurringInterval}
         setRecurringInterval={setRecurringInterval}
-        createCampaign={() => { }} // ... mantido para evitar quebra, se necessário adaptar...
+        createCampaign={createCampaign}
         instances={instances}
         selectedInstanceId={selectedInstanceId}
         setSelectedInstanceId={setSelectedInstanceId}
-        loadingInstances={loadingInstances}
       />
       <CampaignList
         campaigns={campaigns}

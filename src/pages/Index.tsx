@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,9 +19,10 @@ import { ThemeProvider } from "@/components/ui/theme-provider";
 const MainApp = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showSettings, setShowSettings] = useState(false);
-  const [theme, setTheme] = useState(
-    window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
-  );
+  // Correção para o tipo do tema aceitar apenas 'light' | 'dark'
+  const getDefaultTheme = (): "light" | "dark" =>
+    window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  const [theme, setTheme] = useState<"light" | "dark">(getDefaultTheme());
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
