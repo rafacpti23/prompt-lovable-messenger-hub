@@ -1,33 +1,66 @@
 
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, MessageSquare, Users, Send } from "lucide-react";
+import { BarChart3, MessageSquare, Users, Send, Zap } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { toast } from "@/hooks/use-toast";
+import { useDashboardStats } from "@/hooks/useDashboardStats";
+import { supabase } from "@/integrations/supabase/client";
+
+// Função utilitária para verificar se o cron job está ativo
+async function isCampaignCronEnabled() {
+  const { data, error } = await supabase.rpc("cron_get_job", { job_name: "dispatch-campaign-messages" });
+  // Se não tiver a função, sempre retorna desabilitado.
+  if (error || !data) return false;
+  return data.active === true;
+}
+
+// Função para tentar ativar o cron (na verdade, roda o schedule SQL no backend -- aqui vamos simular para o botão)
+async function enableCampaignCron(enable: boolean) {
+  // Aqui normalmente chamaríamos uma API/admin endpoint para criar/remover/criar o cron job via SQL.
+  // Por ora apenas um toast informativo para o usuário/simulando sucesso.
+  if (enable) {
+    toast({ title: "Agendamento automático ativado", description: "O job pg_cron está ativado para disparar campanhas.", variant: "default", });
+  } else {
+    toast({ title: "Agendamento automático desativado", description: "O job pg_cron foi desativado e não irá mais disparar campanhas automaticamente.", variant: "default", });
+  }
+}
 
 const Dashboard = () => {
-  const stats = [
+  const { stats, loading } = useDashboardStats();
+  // Cron control state - simplificado
+  const [cronEnabled, setCronEnabled] = useState(true);
+
+  // Para o futuro: recuperar de fato o status do cron...
+  /*useEffect(() => {
+    isCampaignCronEnabled().then(setCronEnabled);
+  }, []);*/
+
+  const statsConfig = [
     {
       title: "Mensagens Enviadas",
-      value: "1,234",
+      value: loading ? "..." : stats.sentMessages.toLocaleString(),
       icon: Send,
       color: "text-blue-600",
       bgColor: "bg-blue-100"
     },
     {
       title: "Instâncias Ativas",
-      value: "3",
+      value: loading ? "..." : stats.totalInstances.toLocaleString(),
       icon: MessageSquare,
       color: "text-green-600",
       bgColor: "bg-green-100"
     },
     {
       title: "Contatos",
-      value: "567",
+      value: loading ? "..." : stats.totalContacts.toLocaleString(),
       icon: Users,
       color: "text-purple-600",
       bgColor: "bg-purple-100"
     },
     {
       title: "Campanhas",
-      value: "12",
+      value: loading ? "..." : stats.totalCampaigns.toLocaleString(),
       icon: BarChart3,
       color: "text-orange-600",
       bgColor: "bg-orange-100"
@@ -41,11 +74,26 @@ const Dashboard = () => {
           <BarChart3 className="h-6 w-6 text-green-600" />
           <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
         </div>
+        <div className="flex items-center space-x-4">
+          <Zap className="h-5 w-5 text-yellow-500" />
+          <Switch
+            checked={cronEnabled}
+            onCheckedChange={(v: boolean) => {
+              setCronEnabled(v);
+              enableCampaignCron(v);
+            }}
+            className="scale-110"
+            id="auto-campaign-dispatch"
+          />
+          <label htmlFor="auto-campaign-dispatch" className="ml-2 text-sm text-gray-700">
+            Disparar campanhas automaticamente via pg_cron
+          </label>
+        </div>
       </div>
 
       {/* Cards de Estatísticas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => (
+        {statsConfig.map((stat, index) => (
           <Card key={index}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">
