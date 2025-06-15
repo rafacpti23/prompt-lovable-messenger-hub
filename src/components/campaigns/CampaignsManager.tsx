@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Send } from "lucide-react";
 import CampaignForm from "./CampaignForm";
@@ -283,6 +284,8 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         return "bg-blue-100 text-blue-800";
       case "draft":
         return "bg-gray-100 text-gray-800";
+      case "scheduled":
+        return "bg-orange-100 text-orange-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
@@ -298,16 +301,21 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         return "Concluída";
       case "draft":
         return "Rascunho";
+      case "scheduled":
+        return "Agendada";
       default:
         return "Desconhecido";
     }
   };
 
-  // NOVA FUNÇÃO: Iniciar campanha (atualiza status para "scheduled")
+  // NOVA FUNÇÃO: Iniciar campanha (atualiza status para "scheduled" e define scheduled_for)
   const startCampaign = async (id: string) => {
     const { error } = await supabase
       .from("campaigns")
-      .update({ status: "scheduled" })
+      .update({ 
+        status: "scheduled", 
+        scheduled_for: new Date().toISOString() 
+      })
       .eq("id", id);
     if (error) {
       toast({
@@ -321,8 +329,8 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       prev.map((c) => (c.id === id ? { ...c, status: "scheduled" } : c))
     );
     toast({
-      title: "Campanha iniciada",
-      description: "A campanha foi marcada como agendada. Use o botão 'Testar Disparo' no Dashboard para enviar as mensagens.",
+      title: "Campanha agendada",
+      description: "A campanha foi agendada e será enviada automaticamente. Use o botão 'Testar Disparo' no Dashboard para enviar as mensagens.",
     });
   };
 

@@ -1,3 +1,4 @@
+
 import { createClient } from "npm:@supabase/supabase-js";
 
 // CORS headers
@@ -28,21 +29,30 @@ Deno.serve(async (req) => {
     );
   }
 
-  // Busca uma campanha ativa (buscaremos sempre uma por execução)
+  // Busca uma campanha ativa OU agendada (buscaremos sempre uma por execução)
   const { data: campaigns, error: campaignsError } = await supabase
     .from("campaigns")
     .select("*")
-    .eq("status", "active")
+    .in("status", ["active", "scheduled"])
     .limit(1);
 
   if (campaignsError || !campaigns || campaigns.length === 0) {
     return new Response(
-      JSON.stringify({ message: "Nenhuma campanha ativa para disparo." }),
+      JSON.stringify({ message: "Nenhuma campanha ativa ou agendada para disparo." }),
       { status: 200, headers: corsHeaders }
     );
   }
 
   const campaign = campaigns[0];
+  
+  // Se a campanha está como "scheduled", muda para "active" automaticamente
+  if (campaign.status === "scheduled") {
+    await supabase
+      .from("campaigns")
+      .update({ status: "active" })
+      .eq("id", campaign.id);
+  }
+
   const pauseSeconds =
     typeof campaign.pause_between_messages === "number"
       ? campaign.pause_between_messages
