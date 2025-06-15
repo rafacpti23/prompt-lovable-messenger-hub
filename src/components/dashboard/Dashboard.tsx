@@ -8,15 +8,14 @@ import { supabase } from "@/integrations/supabase/client";
 
 // Função utilitária para verificar se o cron job está ativo
 async function isCampaignCronEnabled() {
-  // Explicitly type the return and arguments for Supabase RPC.
-  type CronJobResult = { active: boolean } | null;
-  const { data, error } = await supabase.rpc<CronJobResult, { job_name: string }>(
-    "cron_get_job",
-    { job_name: "dispatch-campaign-messages" }
-  );
+  // Chama o RPC do Supabase sem generics; vamos fazer o type assertion manualmente
+  const { data, error } = await supabase.rpc("cron_get_job", {
+    job_name: "dispatch-campaign-messages",
+  });
   // Se não tiver a função, sempre retorna desabilitado.
   if (error || !data) return false;
-  return data.active === true;
+  // Fazemos type assertion manual para garantir que data tenha a propriedade "active"
+  return (data as { active: boolean }).active === true;
 }
 
 // Função para tentar ativar o cron (na verdade, roda o schedule SQL no backend -- aqui vamos simular para o botão)
