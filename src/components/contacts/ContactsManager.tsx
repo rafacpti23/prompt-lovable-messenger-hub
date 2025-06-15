@@ -1,4 +1,3 @@
-
 import React from "react";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,34 +8,23 @@ import { Users, Plus, Search, Trash2, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import GroupSelector from "./GroupSelector";
 
-const ContactsManager = () => {
-  const [contacts, setContacts] = useState([
-    {
-      id: 1,
-      name: "João Silva",
-      phone: "+55 11 99999-1234",
-      group: "Clientes"
-    },
-    {
-      id: 2,
-      name: "Maria Santos",
-      phone: "+55 11 99999-5678",
-      group: "Prospects"
-    }
-  ]);
+interface Contact {
+  id: number;
+  name: string;
+  phone: string;
+  group: string;
+}
+interface ContactsManagerProps {
+  contacts: Contact[];
+  setContacts: React.Dispatch<React.SetStateAction<Contact[]>>;
+  groups: string[];
+}
+const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts, groups }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [newContact, setNewContact] = useState({ name: "", phone: "", group: "" });
-  const [groups, setGroups] = useState<string[]>(() => {
-    // Inicializa grupos únicos dos contatos existentes
-    const all = Array.from(new Set([...(contacts.map(c => c.group).filter(Boolean))]));
-    return all;
-  });
   const { toast } = useToast();
 
-  // Mantém groups sincronizado se contatos mudam
-  React.useEffect(() => {
-    setGroups(Array.from(new Set([...(contacts.map(c => c.group).filter(Boolean))])));
-  }, [contacts]);
+  // Não precisamos mais do estado local groups, pois agora vem via props do pai
 
   const filteredContacts = contacts.filter(contact =>
     contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -45,8 +33,10 @@ const ContactsManager = () => {
   );
 
   const handleCreateGroup = (group: string) => {
-    if (groups.includes(group)) return;
-    setGroups([...groups, group]);
+    // Não fazemos nada aqui, pois quem controla os grupos são os contatos no nível do pai
+    // O grupo será adicionado ao criar um contato
+    // Apenas seleciona no formulário
+    setNewContact(c => ({ ...c, group }));
     toast({ title: "Grupo criado", description: `Grupo '${group}' foi adicionado.` });
   };
 

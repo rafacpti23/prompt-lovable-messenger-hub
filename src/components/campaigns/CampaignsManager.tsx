@@ -12,7 +12,11 @@ import CampaignList from "./CampaignList";
 
 const GOOGLE_STORAGE_KEY = "googleContactsSheetId";
 
-const CampaignsManager = () => {
+interface CampaignsManagerProps {
+  contactGroups: string[];
+}
+
+const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) => {
   const [campaigns, setCampaigns] = useState([
     {
       id: 1,
@@ -44,7 +48,8 @@ const CampaignsManager = () => {
   const [selectedGroup, setSelectedGroup] = useState("Todos os contatos");
   const { toast } = useToast();
 
-  const supabaseGroups = ["Todos os contatos", "Clientes", "Prospects", "VIP"];
+  // Substituir supabaseGroups pelo prop contactGroups:
+  const supabaseGroups = contactGroups.length > 0 ? contactGroups : ["Todos os contatos"];
   const googleSheetGroups = ["Todos os contatos", "Ativos", "Leads", "Pós-venda"];
 
   useEffect(() => {
