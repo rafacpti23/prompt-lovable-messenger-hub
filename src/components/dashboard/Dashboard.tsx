@@ -45,34 +45,35 @@ const Dashboard = () => {
   // Cron control state - simplificado
   const [cronEnabled, setCronEnabled] = useState(true);
 
+  // --- FIX: Explicit array typing for statConfig to StatConfig[] ---
   const statsConfig: StatConfig[] = [
     {
       title: "Mensagens Enviadas",
       value: loading ? "..." : stats.sentMessages.toLocaleString(),
       icon: Send,
       color: "text-blue-600",
-      bgColor: "bg-blue-100"
+      bgColor: "bg-blue-100",
     },
     {
       title: "Instâncias Ativas",
       value: loading ? "..." : stats.totalInstances.toLocaleString(),
       icon: MessageSquare,
       color: "text-green-600",
-      bgColor: "bg-green-100"
+      bgColor: "bg-green-100",
     },
     {
       title: "Contatos",
       value: loading ? "..." : stats.totalContacts.toLocaleString(),
       icon: Users,
       color: "text-purple-600",
-      bgColor: "bg-purple-100"
+      bgColor: "bg-purple-100",
     },
     {
       title: "Campanhas",
       value: loading ? "..." : stats.totalCampaigns.toLocaleString(),
       icon: BarChart3,
       color: "text-orange-600",
-      bgColor: "bg-orange-100"
+      bgColor: "bg-orange-100",
     }
   ];
 
