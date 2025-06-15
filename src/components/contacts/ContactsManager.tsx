@@ -33,11 +33,16 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
   );
 
   const handleCreateGroup = (group: string) => {
-    // Não fazemos nada aqui, pois quem controla os grupos são os contatos no nível do pai
-    // O grupo será adicionado ao criar um contato
-    // Apenas seleciona no formulário
+    // Se já existe, só seleciona.
+    if (groups.includes(group)) {
+      setNewContact(c => ({ ...c, group }));
+      toast({ title: "Grupo já existe", description: `Grupo '${group}' já está disponível.` });
+      return;
+    }
+    // cria um contato temporário só com o grupo, para forçar derivação
     setNewContact(c => ({ ...c, group }));
     toast({ title: "Grupo criado", description: `Grupo '${group}' foi adicionado.` });
+    // Opcionalmente criaremos (como melhoria futura) um comando para apenas adicionar grupos sem contato.
   };
 
   const addContact = () => {
