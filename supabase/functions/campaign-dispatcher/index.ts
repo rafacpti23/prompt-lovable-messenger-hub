@@ -1,5 +1,4 @@
-
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "npm:@supabase/supabase-js";
 
 // CORS headers
 const corsHeaders = {
