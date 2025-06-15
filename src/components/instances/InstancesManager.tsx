@@ -1,33 +1,72 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MessageSquare, Plus, QrCode, Trash2, Power } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { createInstance as createInstanceApi, isApiConfigured, getApiConfig } from "@/services/evolutionApi";
+import {
+  createInstance as createInstanceApi,
+  isApiConfigured,
+  getApiConfig,
+  getQrCode,
+  connectInstance,
+  deleteInstance as deleteInstanceApi,
+} from "@/services/evolutionApi";
+
+type Instance = {
+  instanceId: string;
+  instanceName: string;
+  status: string;
+  number?: string;
+};
 
 const InstancesManager = () => {
-  const [instances, setInstances] = useState([
-    {
-      id: 1,
-      name: "whatsapp-1",
-      status: "connected",
-      phone: "+55 11 99999-1234"
-    },
-    {
-      id: 2,
-      name: "whatsapp-2", 
-      status: "disconnected",
-      phone: ""
-    }
-  ]);
+  const [instances, setInstances] = useState<Instance[]>([]);
   const [newInstanceName, setNewInstanceName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [loadingInstances, setLoadingInstances] = useState(false);
+  const [qrModal, setQrModal] = useState<{ open: boolean; instanceName?: string; qrBase64?: string }>({ open: false });
   const { toast } = useToast();
 
-  const createInstance = async () => {
+  // Carrega as instâncias reais da Evolution API
+  const fetchInstances = async () => {
+    if (!isApiConfigured()) {
+      setInstances([]);
+      return;
+    }
+    setLoadingInstances(true);
+    try {
+      const { apiUrl } = getApiConfig();
+      const headers = {
+        "Content-Type": "application/json",
+        apikey: localStorage.getItem("evolution_api_key")!,
+      };
+      const res = await fetch(`${apiUrl}/instance/fetchInstances`, { headers });
+      if (!res.ok) throw new Error("Falha ao buscar instâncias");
+      const json = await res.json();
+      setInstances(json?.instances || []);
+    } catch (err: any) {
+      toast({
+        title: "Erro",
+        description: err?.message || "Falha ao buscar instâncias.",
+        variant: "destructive",
+      });
+      setInstances([]);
+    } finally {
+      setLoadingInstances(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInstances();
+    // Recarregar sempre que uma nova for criada/excluída/alterada usando fetchInstances
+    // eslint-disable-next-line
+  }, []);
+
+  const handleCreateInstance = async () => {
     if (!newInstanceName.trim()) {
       toast({
         title: "Erro",
@@ -40,33 +79,20 @@ const InstancesManager = () => {
       toast({
         title: "Configuração faltando",
         description: "Configure a URL da API e a API Key nas Configurações.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
 
     setIsCreating(true);
     try {
-      // Nova chamada real para a Evolution API
-      const response = await createInstanceApi(newInstanceName);
-
-      // Se retornar algo esperado, mostrar na tela/feedback
+      await createInstanceApi(newInstanceName);
       toast({
         title: "Instância criada com sucesso!",
-        description: `Instância ${newInstanceName} criada (ID: ${response.instanceId ?? "-"}).`,
+        description: `Instância ${newInstanceName} criada.`,
       });
-
-      // Se desejar, adicionar ao state a nova instância de acordo com API de listagem
-      setInstances([
-        ...instances,
-        {
-          id: Date.now(),
-          name: newInstanceName,
-          status: "disconnected",
-          phone: ""
-        }
-      ]);
       setNewInstanceName("");
+      fetchInstances();
     } catch (error: any) {
       toast({
         title: "Erro ao criar instância",
@@ -78,18 +104,59 @@ const InstancesManager = () => {
     }
   };
 
-  const deleteInstance = (id: number) => {
-    setInstances(instances.filter(instance => instance.id !== id));
-    toast({
-      title: "Instância removida",
-      description: "Instância deletada com sucesso",
-    });
+  const handleConnect = async (instanceName: string) => {
+    try {
+      await connectInstance(instanceName);
+      toast({
+        title: "Solicitação de conexão enviada!",
+        description: `Aguarde o status atualizar.`,
+      });
+      fetchInstances();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao conectar",
+        description: error?.message || "Falha ao conectar instância.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleShowQr = async (instanceName: string) => {
+    try {
+      const qrBase64 = await getQrCode(instanceName);
+      setQrModal({ open: true, instanceName, qrBase64 });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao buscar QR Code",
+        description: error?.message || "Falha ao buscar QR Code.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDelete = async (instanceName: string) => {
+    try {
+      await deleteInstanceApi(instanceName);
+      toast({
+        title: "Instância removida",
+        description: "Instância deletada com sucesso",
+      });
+      fetchInstances();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao deletar instância",
+        description: error?.message || "Falha ao deletar instância.",
+        variant: "destructive",
+      });
+    }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case "open":
       case "connected":
         return "bg-green-100 text-green-800";
+      case "close":
       case "disconnected":
         return "bg-red-100 text-red-800";
       default:
@@ -99,8 +166,10 @@ const InstancesManager = () => {
 
   const getStatusText = (status: string) => {
     switch (status) {
+      case "open":
       case "connected":
         return "Conectado";
+      case "close":
       case "disconnected":
         return "Desconectado";
       default:
@@ -110,11 +179,33 @@ const InstancesManager = () => {
 
   return (
     <div className="space-y-6">
+      <Dialog open={qrModal.open} onOpenChange={v => setQrModal({ open: v })}>
+        <DialogContent className="sm:max-w-xs flex flex-col items-center">
+          <DialogHeader>
+            <DialogTitle>QR Code - {qrModal.instanceName}</DialogTitle>
+          </DialogHeader>
+          {qrModal.qrBase64 ? (
+            <img
+              src={`data:image/png;base64,${qrModal.qrBase64}`}
+              alt="QR Code"
+              className="w-56 h-56 object-contain border rounded mx-auto"
+            />
+          ) : (
+            <div className="w-56 h-56 flex items-center justify-center text-gray-400">
+              Nenhum QR code gerado.
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <MessageSquare className="h-6 w-6 text-green-600" />
           <h2 className="text-2xl font-bold text-gray-900">Gerenciar Instâncias</h2>
         </div>
+        <Button variant="outline" size="sm" onClick={fetchInstances} disabled={loadingInstances}>
+          Atualizar
+        </Button>
       </div>
 
       {/* Criar Nova Instância */}
@@ -134,7 +225,7 @@ const InstancesManager = () => {
                 onChange={(e) => setNewInstanceName(e.target.value)}
               />
             </div>
-            <Button onClick={createInstance} disabled={isCreating}>
+            <Button onClick={handleCreateInstance} disabled={isCreating}>
               <Plus className="h-4 w-4 mr-2" />
               {isCreating ? "Criando..." : "Criar"}
             </Button>
@@ -144,49 +235,60 @@ const InstancesManager = () => {
 
       {/* Lista de Instâncias */}
       <div className="grid gap-4">
-        {instances.map((instance) => (
-          <Card key={instance.id}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2">
-                    <MessageSquare className="h-5 w-5 text-green-600" />
-                    <span className="font-medium">{instance.name}</span>
+        {loadingInstances ? (
+          <div className="text-center py-12 text-gray-500">Carregando instâncias...</div>
+        ) : instances.length === 0 ? (
+          <div className="text-center py-12 text-gray-400">
+            Nenhuma instância cadastrada.
+          </div>
+        ) : (
+          instances.map((instance) => (
+            <Card key={instance.instanceId}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-2">
+                      <MessageSquare className="h-5 w-5 text-green-600" />
+                      <span className="font-medium">{instance.instanceName}</span>
+                    </div>
+                    <Badge className={getStatusColor(instance.status)}>
+                      {getStatusText(instance.status)}
+                    </Badge>
+                    {instance.number && (
+                      <span className="text-sm text-gray-500">{instance.number}</span>
+                    )}
                   </div>
-                  <Badge className={getStatusColor(instance.status)}>
-                    {getStatusText(instance.status)}
-                  </Badge>
-                  {instance.phone && (
-                    <span className="text-sm text-gray-500">{instance.phone}</span>
-                  )}
-                </div>
-                <div className="flex items-center space-x-2">
-                  {instance.status === "disconnected" && (
-                    <Button variant="outline" size="sm">
-                      <QrCode className="h-4 w-4 mr-2" />
-                      QR Code
+                  <div className="flex items-center space-x-2">
+                    {(instance.status === "close" || instance.status === "disconnected") && (
+                      <Button variant="outline" size="sm" onClick={() => handleShowQr(instance.instanceName)}>
+                        <QrCode className="h-4 w-4 mr-2" />
+                        QR Code
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleConnect(instance.instanceName)}
+                    >
+                      <Power className="h-4 w-4 mr-2" />
+                      {["connected", "open"].includes(instance.status) ? "Desconectar" : "Conectar"}
                     </Button>
-                  )}
-                  <Button variant="outline" size="sm">
-                    <Power className="h-4 w-4 mr-2" />
-                    {instance.status === "connected" ? "Desconectar" : "Conectar"}
-                  </Button>
-                  <Button 
-                    variant="destructive" 
-                    size="sm"
-                    onClick={() => deleteInstance(instance.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDelete(instance.instanceName)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );
 };
 
 export default InstancesManager;
-
