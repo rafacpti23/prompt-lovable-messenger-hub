@@ -7,6 +7,7 @@ export interface Instance {
   id: string;
   instance_name: string;
   status: string | null;
+  user_id: string; // <-- Add this line
 }
 
 export function useInstanceList() {
@@ -33,6 +34,7 @@ export function useInstanceList() {
             id: inst.id,
             instance_name: inst.instance_name,
             status: inst.status,
+            user_id: inst.user_id, // <-- Map user_id from db
           }))
         );
       }
