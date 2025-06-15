@@ -1,10 +1,13 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3, MessageSquare, Users, Send, Zap } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
+import { useMessagesByDay } from "@/hooks/useMessagesByDay";
 import { supabase } from "@/integrations/supabase/client";
+import { BarChart, XAxis, YAxis, Tooltip, Bar, ResponsiveContainer, CartesianGrid } from "recharts";
 
 // Função utilitária para verificar se o cron job está ativo
 async function isCampaignCronEnabled() {
@@ -16,7 +19,7 @@ async function isCampaignCronEnabled() {
   return (data as { active: boolean }).active === true;
 }
 
-// Função para tentar ativar o cron (na verdade, roda o schedule SQL no backend -- aqui vamos simular para o botão)
+// Função para ativar/desativar o cron (só simula para o botão, no frontend)
 async function enableCampaignCron(enable: boolean) {
   if (enable) {
     toast({
@@ -43,7 +46,7 @@ type StatConfig = {
 
 const Dashboard = () => {
   const { stats, loading } = useDashboardStats();
-  // Cron control state - simplificado
+  const { data: messagesByDay, loading: loadingGraph } = useMessagesByDay();
   const [cronEnabled, setCronEnabled] = useState(true);
 
   // Explicitly type array
@@ -124,17 +127,33 @@ const Dashboard = () => {
         })}
       </div>
 
-      {/* Gráfico Placeholder */}
+      {/* Gráfico de Mensagens por Dia */}
       <Card>
         <CardHeader>
-          <CardTitle>Mensagens por Dia</CardTitle>
+          <CardTitle>Mensagens por Dia (Últ. 30 dias)</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-            <div className="text-center">
-              <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500">Gráfico será implementado em breve</p>
-            </div>
+            {loadingGraph ? (
+              <div className="text-gray-400">Carregando gráfico...</div>
+            ) : messagesByDay && messagesByDay.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={messagesByDay}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="day" tick={{ fontSize: 12 }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                  <Tooltip 
+                    labelFormatter={(value) => `Dia: ${value}`} 
+                    formatter={(value) => [value, "Enviadas"]}
+                  />
+                  <Bar dataKey="count" fill="#60a5fa" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="text-gray-400 text-center">
+                Nenhuma mensagem enviada nos últimos 30 dias.
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
