@@ -70,6 +70,9 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
   selectedInstanceId,
   setSelectedInstanceId,
 }) => {
+  // Só mostrar instâncias conectadas
+  const connectedInstances = instances.filter(inst => inst.status === "connected");
+
   return (
     <Card>
       <CardHeader>
@@ -88,12 +91,12 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
               value={selectedInstanceId}
               onChange={e => setSelectedInstanceId(e.target.value)}
             >
-              {instances.length === 0 && (
+              {connectedInstances.length === 0 && (
                 <option value="">Nenhuma instância conectada</option>
               )}
-              {instances.map((inst) => (
+              {connectedInstances.map((inst) => (
                 <option value={inst.id} key={inst.id}>
-                  {inst.instance_name} {inst.status === "connected" ? "(Conectada)" : ""}
+                  {inst.instance_name} (Conectada)
                 </option>
               ))}
             </select>
