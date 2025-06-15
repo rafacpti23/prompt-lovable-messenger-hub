@@ -19,7 +19,6 @@ import { ThemeProvider } from "@/components/ui/theme-provider";
 const MainApp = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showSettings, setShowSettings] = useState(false);
-  // Correção para o tipo do tema aceitar apenas 'light' | 'dark'
   const getDefaultTheme = (): "light" | "dark" =>
     window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   const [theme, setTheme] = useState<"light" | "dark">(getDefaultTheme());
@@ -30,11 +29,9 @@ const MainApp = () => {
   }, [theme]);
 
   // ======================== CONTATOS ========================
-  // Estado centralizado para contatos e grupos
   const [contacts, setContacts] = useState<any[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(true);
 
-  // Derivar os grupos únicos dos contatos (considerar grupo == tags[0] ou similar)
   const groups = Array.from(
     new Set(contacts.map(c => c.group).filter(Boolean))
   );
@@ -62,11 +59,10 @@ const MainApp = () => {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       if (!error) {
-        // Assegura que cada contato terá o campo .group, extraído de tags[0] se presente
         setContacts(
           (data || []).map((c: any) => ({
             ...c,
-            group: c.tags?.[0] || "", // group calculated from tags[0]
+            group: c.tags?.[0] || "",
           }))
         );
       }
@@ -124,7 +120,11 @@ const MainApp = () => {
             <div className="flex justify-between items-center h-16">
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
-                  <MessageSquare className="h-8 w-8 text-green-600" />
+                  <img 
+                    src="/lovable-uploads/c9bbdaa6-c367-4489-8438-ef65ccaf62f2.png" 
+                    alt="WhatsApp Pro Logo" 
+                    className="h-8 w-8"
+                  />
                   <h1 className="text-2xl font-bold text-gray-900 dark:text-white">WhatsApp Pro</h1>
                 </div>
               </div>
@@ -180,13 +180,13 @@ const MainApp = () => {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="dashboard">
+            <TabsContent value="dashboard" className="min-h-[600px]">
               <Dashboard />
             </TabsContent>
-            <TabsContent value="instances">
+            <TabsContent value="instances" className="min-h-[600px]">
               <InstancesManager />
             </TabsContent>
-            <TabsContent value="contacts">
+            <TabsContent value="contacts" className="min-h-[600px]">
               <ContactsManager
                 contacts={contacts}
                 setContacts={setContacts}
@@ -195,7 +195,7 @@ const MainApp = () => {
                 user={user}
               />
             </TabsContent>
-            <TabsContent value="campaigns">
+            <TabsContent value="campaigns" className="min-h-[600px]">
               <CampaignsManager
                 contactGroups={groups}
               />

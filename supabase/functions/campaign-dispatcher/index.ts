@@ -18,16 +18,11 @@ Deno.serve(async (req) => {
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // Evolution API configuration (from localStorage in app, here must use secrets)
-  const evolutionApiUrl = Deno.env.get("EVOLUTION_API_URL");
-  const evolutionApiKey = Deno.env.get("EVOLUTION_API_KEY");
+  // Evolution API configuration - usando configuração centralizada
+  const evolutionApiUrl = "https://api.ramelseg.com.br";
+  const evolutionApiKey = "d86920ba398e31464c46401214779885";
 
-  if (!evolutionApiUrl || !evolutionApiKey) {
-    return new Response(
-      JSON.stringify({ error: "Evolution API URL/KEY não configurados." }),
-      { status: 500, headers: corsHeaders }
-    );
-  }
+  console.log("Evolution API Config:", { evolutionApiUrl, evolutionApiKey });
 
   // Busca uma campanha ativa OU agendada (buscaremos sempre uma por execução)
   const { data: campaigns, error: campaignsError } = await supabase
@@ -86,23 +81,32 @@ Deno.serve(async (req) => {
   // Remove "+" se houver no número do contato
   const destinationPhone = messageRow.phone.replace(/^\+/, "");
 
+  // URL correta da Evolution API com instance_id
+  const evolutionUrl = `${evolutionApiUrl}/message/sendText/${campaign.instance_id}`;
+  
   const sendBody = {
-    instanceName: campaign.instance_id, // Pode ser instance_name, confira na sua estrutura
     number: destinationPhone,
-    message: messageRow.message,
+    text: messageRow.message, // Evolution API usa 'text', não 'message'
   };
 
+  console.log("Enviando para Evolution API:", {
+    url: evolutionUrl,
+    headers: { apikey: evolutionApiKey },
+    body: sendBody
+  });
+
   // Envio pela Evolution API
-  const evolutionResp = await fetch(`${evolutionApiUrl}/message/sendText`, {
+  const evolutionResp = await fetch(evolutionUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      apikey: evolutionApiKey,
+      apikey: evolutionApiKey, // Evolution API usa 'apikey', não 'API Key'
     },
     body: JSON.stringify(sendBody),
   });
 
   const respData = await evolutionResp.json();
+  console.log("Resposta da Evolution API:", { status: evolutionResp.status, data: respData });
 
   // Atualiza status da mensagem como enviada ou erro, e responde
   const nowISO = new Date().toISOString();
