@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { MessageSquare, Plus, QrCode, Trash2, Power } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { createInstance as createInstanceApi, isApiConfigured, getApiConfig } from "@/services/evolutionApi";
 
 const InstancesManager = () => {
   const [instances, setInstances] = useState([
@@ -35,28 +36,41 @@ const InstancesManager = () => {
       });
       return;
     }
+    if (!isApiConfigured()) {
+      toast({
+        title: "Configuração faltando",
+        description: "Configure a URL da API e a API Key nas Configurações.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     setIsCreating(true);
     try {
-      // Simular criação
-      const newInstance = {
-        id: Date.now(),
-        name: newInstanceName,
-        status: "disconnected" as const,
-        phone: ""
-      };
-      
-      setInstances([...instances, newInstance]);
-      setNewInstanceName("");
-      
+      // Nova chamada real para a Evolution API
+      const response = await createInstanceApi(newInstanceName);
+
+      // Se retornar algo esperado, mostrar na tela/feedback
       toast({
-        title: "Instância criada",
-        description: `Instância ${newInstanceName} criada com sucesso`,
+        title: "Instância criada com sucesso!",
+        description: `Instância ${newInstanceName} criada (ID: ${response.instanceId ?? "-"}).`,
       });
-    } catch (error) {
+
+      // Se desejar, adicionar ao state a nova instância de acordo com API de listagem
+      setInstances([
+        ...instances,
+        {
+          id: Date.now(),
+          name: newInstanceName,
+          status: "disconnected",
+          phone: ""
+        }
+      ]);
+      setNewInstanceName("");
+    } catch (error: any) {
       toast({
-        title: "Erro",
-        description: "Falha ao criar instância",
+        title: "Erro ao criar instância",
+        description: error?.message || "Falha ao criar instância via Evolution API.",
         variant: "destructive",
       });
     } finally {
@@ -175,3 +189,4 @@ const InstancesManager = () => {
 };
 
 export default InstancesManager;
+
