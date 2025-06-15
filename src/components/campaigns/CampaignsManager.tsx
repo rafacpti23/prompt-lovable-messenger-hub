@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Send, Plus, Play, Pause, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+const GOOGLE_STORAGE_KEY = "googleContactsSheetId";
 
 const CampaignsManager = () => {
   const [campaigns, setCampaigns] = useState([
@@ -28,7 +29,36 @@ const CampaignsManager = () => {
     }
   ]);
   const [newCampaign, setNewCampaign] = useState({ name: "", message: "" });
+  const [contactSource, setContactSource] = useState<"supabase" | "google">("supabase");
+  const [googleConnected, setGoogleConnected] = useState<boolean>(false);
+  const [googleSheetName, setGoogleSheetName] = useState<string | null>(null);
+  const [scheduleType, setScheduleType] = useState<"once" | "recurring">("once");
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("");
+  const [recurringInterval, setRecurringInterval] = useState<number>(7);
   const { toast } = useToast();
+
+  // simulação: efeito para recuperar do localStorage a planilha do usuário
+  useEffect(() => {
+    const sheetId = localStorage.getItem(GOOGLE_STORAGE_KEY);
+    if (sheetId) {
+      setGoogleConnected(true);
+      setGoogleSheetName(sheetId);
+    }
+  }, []);
+
+  // simulação: conectar Google (aqui só define sheet id/nome, integração virá depois)
+  const handleConnectGoogle = () => {
+    // abrir OAuth aqui de verdade (futuro)
+    const fakeSheetId = "MinhaPlanilhaContatosGoogle";
+    setGoogleConnected(true);
+    setGoogleSheetName(fakeSheetId);
+    localStorage.setItem(GOOGLE_STORAGE_KEY, fakeSheetId);
+    toast({
+      title: "Google Sheets conectado",
+      description: "Planilha de contatos vinculada com sucesso.",
+    });
+  };
 
   const createCampaign = () => {
     if (!newCampaign.name || !newCampaign.message) {
@@ -45,7 +75,15 @@ const CampaignsManager = () => {
       ...newCampaign,
       status: "draft" as const,
       sent: 0,
-      total: 0
+      total: 0,
+      contactSource,
+      schedule: {
+        type: scheduleType,
+        date: scheduleDate,
+        time: scheduleTime,
+        intervalDays: scheduleType === "recurring" ? recurringInterval : undefined,
+      },
+      googleSheetName: contactSource === "google" ? googleSheetName : undefined,
     };
 
     setCampaigns([...campaigns, campaign]);
@@ -114,6 +152,61 @@ const CampaignsManager = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
+
+            {/* Seleção da base de contatos */}
+            <div>
+              <label className="block font-medium mb-2">Fonte de contatos:</label>
+              <div className="flex space-x-3">
+                <Button
+                  variant={contactSource === "supabase" ? "default" : "outline"}
+                  onClick={() => setContactSource("supabase")}
+                  type="button"
+                >
+                  Supabase
+                  {contactSource === "supabase" && <Badge variant="secondary" className="ml-2">Selecionado</Badge>}
+                </Button>
+                <Button
+                  variant={contactSource === "google" ? "default" : "outline"}
+                  onClick={() => setContactSource("google")}
+                  type="button"
+                >
+                  Google Sheets
+                  {contactSource === "google" && <Badge variant="secondary" className="ml-2">Selecionado</Badge>}
+                </Button>
+              </div>
+              {contactSource === "google" && (
+                <div className="mt-3 space-y-1">
+                  {googleConnected && googleSheetName ? (
+                    <div className="flex items-center space-x-2 text-green-700">
+                      <span className="font-semibold">Planilha conectada:</span>
+                      <span>{googleSheetName}</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setGoogleConnected(false);
+                          setGoogleSheetName(null);
+                          localStorage.removeItem(GOOGLE_STORAGE_KEY);
+                        }}
+                        className="ml-2"
+                      >
+                        Trocar Planilha
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button 
+                      variant="outline" 
+                      onClick={handleConnectGoogle}
+                      type="button"
+                    >
+                      Conectar Google Sheets
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Nome e mensagem da campanha */}
             <Input
               placeholder="Nome da campanha"
               value={newCampaign.name}
@@ -125,6 +218,59 @@ const CampaignsManager = () => {
               onChange={(e) => setNewCampaign({...newCampaign, message: e.target.value})}
               rows={4}
             />
+
+            {/* Agendamento */}
+            <div>
+              <label className="block font-medium mb-2">Agendamento:</label>
+              <div className="flex items-center space-x-4 mb-2">
+                <Button
+                  variant={scheduleType === "once" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setScheduleType("once")}
+                  type="button"
+                >
+                  Único (escolher data/hora)
+                </Button>
+                <Button
+                  variant={scheduleType === "recurring" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setScheduleType("recurring")}
+                  type="button"
+                >
+                  Recorrente (a cada X dias)
+                </Button>
+              </div>
+              {scheduleType === "once" ? (
+                <div className="flex gap-3">
+                  <Input
+                    type="date"
+                    value={scheduleDate}
+                    onChange={e => setScheduleDate(e.target.value)}
+                    className="w-40"
+                  />
+                  <Input
+                    type="time"
+                    value={scheduleTime}
+                    onChange={e => setScheduleTime(e.target.value)}
+                    className="w-32"
+                  />
+                </div>
+              ) : (
+                <div className="flex gap-3 items-center">
+                  <Input
+                    type="number"
+                    min={1}
+                    value={recurringInterval}
+                    onChange={e => setRecurringInterval(Number(e.target.value))}
+                    className="w-24"
+                  />
+                  <span>dias</span>
+                  <span className="text-muted-foreground text-xs">(ex: a cada 7 dias)</span>
+                </div>
+              )}
+            </div>
+
+            {/* Botão criar campanha */}
             <Button onClick={createCampaign}>
               <Plus className="h-4 w-4 mr-2" />
               Criar Campanha
