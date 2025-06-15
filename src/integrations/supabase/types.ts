@@ -9,6 +9,56 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      campaigns: {
+        Row: {
+          contact_ids: string[]
+          created_at: string
+          id: string
+          instance_id: string
+          message: string
+          name: string
+          pause_between_messages: number | null
+          scheduled_for: string | null
+          status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          contact_ids: string[]
+          created_at?: string
+          id?: string
+          instance_id: string
+          message: string
+          name: string
+          pause_between_messages?: number | null
+          scheduled_for?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          contact_ids?: string[]
+          created_at?: string
+          id?: string
+          instance_id?: string
+          message?: string
+          name?: string
+          pause_between_messages?: number | null
+          scheduled_for?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chatwhatsapp: {
         Row: {
           active: boolean | null
@@ -63,6 +113,36 @@ export type Database = {
           pagamento_confirmado?: boolean | null
           status?: string | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      contacts: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          phone: string
+          tags: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          phone: string
+          tags?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          phone?: string
+          tags?: string[] | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -186,6 +266,42 @@ export type Database = {
         }
         Relationships: []
       }
+      instances: {
+        Row: {
+          created_at: string
+          id: string
+          instance_name: string
+          integration: string
+          phone_number: string | null
+          qr_code: string | null
+          status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          instance_name: string
+          integration?: string
+          phone_number?: string | null
+          qr_code?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          instance_name?: string
+          integration?: string
+          phone_number?: string | null
+          qr_code?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       localizacoes: {
         Row: {
           frete_id: string | null
@@ -210,6 +326,57 @@ export type Database = {
         }
         Relationships: []
       }
+      messages_log: {
+        Row: {
+          campaign_id: string | null
+          contact_id: string | null
+          id: string
+          message: string
+          phone: string
+          response: Json | null
+          scheduled_for: string | null
+          sent_at: string
+          status: string
+        }
+        Insert: {
+          campaign_id?: string | null
+          contact_id?: string | null
+          id?: string
+          message: string
+          phone: string
+          response?: Json | null
+          scheduled_for?: string | null
+          sent_at?: string
+          status: string
+        }
+        Update: {
+          campaign_id?: string | null
+          contact_id?: string | null
+          id?: string
+          message?: string
+          phone?: string
+          response?: Json | null
+          scheduled_for?: string | null
+          sent_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_log_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_log_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       motoristas: {
         Row: {
           cpf: string
@@ -231,6 +398,33 @@ export type Database = {
           id?: string
           nome?: string
           telefone?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          role: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id: string
+          role?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          role?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -260,6 +454,57 @@ export type Database = {
           tool_destino?: string | null
         }
         Relationships: []
+      }
+      scheduled_messages: {
+        Row: {
+          campaign_id: string
+          contact_id: string
+          created_at: string
+          id: string
+          message: string
+          phone: string
+          scheduled_for: string
+          sent_at: string | null
+          status: string | null
+        }
+        Insert: {
+          campaign_id: string
+          contact_id: string
+          created_at?: string
+          id?: string
+          message: string
+          phone: string
+          scheduled_for: string
+          sent_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          contact_id?: string
+          created_at?: string
+          id?: string
+          message?: string
+          phone?: string
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_messages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_messages_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tob_fretes: {
         Row: {

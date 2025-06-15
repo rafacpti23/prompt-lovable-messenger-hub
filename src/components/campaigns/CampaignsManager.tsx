@@ -1,85 +1,127 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Send, Plus, Calendar, Clock, Users, MessageSquare, Settings } from "lucide-react";
+import { Plus, Send, Calendar, Clock, Users, Trash2, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Campaign {
   id: string;
   name: string;
   message: string;
-  instanceId: string;
-  selectedContacts: string[];
-  scheduledDate: string;
-  scheduledTime: string;
-  status: "draft" | "scheduled" | "sending" | "completed" | "failed";
-  createdAt: string;
-  sendDelay?: number; // Pausa entre envios em segundos
+  instance_id: string;
+  contact_ids: string[];
+  scheduled_for?: string;
+  status: string;
+  pause_between_messages: number;
+  created_at: string;
+  instance?: {
+    instance_name: string;
+    status: string;
+  };
+}
+
+interface Instance {
+  id: string;
+  instance_name: string;
+  status: string;
+}
+
+interface Contact {
+  id: string;
+  name: string;
+  phone: string;
 }
 
 const CampaignsManager = () => {
-  const [campaigns, setCampaigns] = useState<Campaign[]>([
-    {
-      id: "1",
-      name: "Promoção Black Friday",
-      message: "Olá {{nome}}! Não perca nossa super promoção de Black Friday com até 70% de desconto!",
-      instanceId: "marketing-principal",
-      selectedContacts: ["1", "2", "3"],
-      scheduledDate: "2024-12-15",
-      scheduledTime: "14:00",
-      status: "scheduled",
-      createdAt: "2024-01-15",
-      sendDelay: 5
-    },
-    {
-      id: "2",
-      name: "Newsletter Semanal",
-      message: "Oi {{nome}}! Confira as novidades desta semana em nosso blog.",
-      instanceId: "marketing-principal",
-      selectedContacts: ["1", "2"],
-      scheduledDate: "2024-12-16",
-      scheduledTime: "09:00",
-      status: "completed",
-      createdAt: "2024-01-10",
-      sendDelay: 3
-    }
-  ]);
-
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [instances, setInstances] = useState<Instance[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
   const [newCampaign, setNewCampaign] = useState({
     name: "",
     message: "",
-    instanceId: "",
-    selectedContacts: [] as string[],
-    scheduledDate: "",
-    scheduledTime: "",
-    sendDelay: 5
+    instance_id: "",
+    scheduled_for: "",
+    pause_between_messages: 5
   });
-
+  const { user } = useAuth();
   const { toast } = useToast();
 
-  // Mock data
-  const availableInstances = [
-    { id: "marketing-principal", name: "Marketing Principal" },
-    { id: "suporte-cliente", name: "Suporte ao Cliente" }
-  ];
+  useEffect(() => {
+    if (user) {
+      fetchCampaigns();
+      fetchInstances();
+      fetchContacts();
+    }
+  }, [user]);
 
-  const availableContacts = [
-    { id: "1", name: "João Silva" },
-    { id: "2", name: "Maria Santos" },
-    { id: "3", name: "Pedro Oliveira" }
-  ];
+  const fetchCampaigns = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('campaigns')
+        .select(`
+          *,
+          instance:instances(instance_name, status)
+        `)
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false });
 
-  const handleCreateCampaign = () => {
-    if (!newCampaign.name || !newCampaign.message || !newCampaign.instanceId) {
+      if (error) throw error;
+      setCampaigns(data || []);
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar campanhas",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchInstances = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('instances')
+        .select('id, instance_name, status')
+        .eq('user_id', user?.id)
+        .eq('status', 'connected');
+
+      if (error) throw error;
+      setInstances(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar instâncias:', error);
+    }
+  };
+
+  const fetchContacts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('id, name, phone')
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+      setContacts(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar contatos:', error);
+    }
+  };
+
+  const handleCreateCampaign = async () => {
+    if (!newCampaign.name || !newCampaign.message || !newCampaign.instance_id || selectedContacts.length === 0) {
       toast({
         title: "Erro",
         description: "Preencha todos os campos obrigatórios",
@@ -88,37 +130,103 @@ const CampaignsManager = () => {
       return;
     }
 
-    const campaign: Campaign = {
-      id: Date.now().toString(),
-      ...newCampaign,
-      status: "draft",
-      createdAt: new Date().toISOString().split('T')[0]
-    };
+    try {
+      const campaignData = {
+        user_id: user?.id,
+        name: newCampaign.name,
+        message: newCampaign.message,
+        instance_id: newCampaign.instance_id,
+        contact_ids: selectedContacts,
+        scheduled_for: newCampaign.scheduled_for || null,
+        pause_between_messages: newCampaign.pause_between_messages,
+        status: newCampaign.scheduled_for ? 'scheduled' : 'draft'
+      };
 
-    setCampaigns([...campaigns, campaign]);
-    setNewCampaign({
-      name: "",
-      message: "",
-      instanceId: "",
-      selectedContacts: [],
-      scheduledDate: "",
-      scheduledTime: "",
-      sendDelay: 5
-    });
-    setShowCreateDialog(false);
+      const { data, error } = await supabase
+        .from('campaigns')
+        .insert([campaignData])
+        .select()
+        .single();
 
-    toast({
-      title: "Campanha criada!",
-      description: "A campanha foi salva como rascunho"
-    });
+      if (error) throw error;
+
+      // Se agendado, criar mensagens programadas
+      if (newCampaign.scheduled_for) {
+        const scheduledMessages = selectedContacts.map((contactId, index) => {
+          const contact = contacts.find(c => c.id === contactId);
+          const messageTime = new Date(newCampaign.scheduled_for);
+          messageTime.setSeconds(messageTime.getSeconds() + (index * newCampaign.pause_between_messages));
+
+          return {
+            campaign_id: data.id,
+            contact_id: contactId,
+            phone: contact?.phone || '',
+            message: newCampaign.message.replace(/\{\{nome\}\}/g, contact?.name || ''),
+            scheduled_for: messageTime.toISOString()
+          };
+        });
+
+        const { error: scheduleError } = await supabase
+          .from('scheduled_messages')
+          .insert(scheduledMessages);
+
+        if (scheduleError) throw scheduleError;
+      }
+
+      setNewCampaign({
+        name: "",
+        message: "",
+        instance_id: "",
+        scheduled_for: "",
+        pause_between_messages: 5
+      });
+      setSelectedContacts([]);
+      setShowCreateDialog(false);
+      fetchCampaigns();
+
+      toast({
+        title: "Campanha criada!",
+        description: newCampaign.scheduled_for 
+          ? "Campanha agendada com sucesso" 
+          : "Campanha salva como rascunho"
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao criar campanha",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteCampaign = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('campaigns')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setCampaigns(campaigns.filter(campaign => campaign.id !== id));
+      toast({
+        title: "Campanha excluída",
+        description: "A campanha foi removida com sucesso"
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir campanha",
+        variant: "destructive"
+      });
+    }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "draft": return "bg-gray-100 text-gray-800";
-      case "scheduled": return "bg-blue-100 text-blue-800";
-      case "sending": return "bg-yellow-100 text-yellow-800";
-      case "completed": return "bg-green-100 text-green-800";
+      case "sent": return "bg-green-100 text-green-800";
+      case "sending": return "bg-blue-100 text-blue-800";
+      case "scheduled": return "bg-yellow-100 text-yellow-800";
       case "failed": return "bg-red-100 text-red-800";
       default: return "bg-gray-100 text-gray-800";
     }
@@ -126,137 +234,136 @@ const CampaignsManager = () => {
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case "draft": return "Rascunho";
-      case "scheduled": return "Agendado";
+      case "sent": return "Enviada";
       case "sending": return "Enviando";
-      case "completed": return "Concluído";
-      case "failed": return "Falhou";
-      default: return "Desconhecido";
+      case "scheduled": return "Agendada";
+      case "failed": return "Falha";
+      default: return "Rascunho";
     }
   };
+
+  const formatDateTime = (dateTime: string) => {
+    return new Date(dateTime).toLocaleString('pt-BR');
+  };
+
+  const handleContactSelection = (contactId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedContacts([...selectedContacts, contactId]);
+    } else {
+      setSelectedContacts(selectedContacts.filter(id => id !== contactId));
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Gerenciar Campanhas</h2>
-          <p className="text-gray-600">Crie e agende suas campanhas de mensagem</p>
+          <p className="text-gray-600">Crie e gerencie suas campanhas de mensagens</p>
         </div>
         
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogTrigger asChild>
-            <Button className="bg-purple-600 hover:bg-purple-700">
+            <Button className="bg-green-600 hover:bg-green-700">
               <Plus className="h-4 w-4 mr-2" />
               Nova Campanha
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Criar Nova Campanha</DialogTitle>
             </DialogHeader>
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="name">Nome da Campanha</Label>
-                  <Input
-                    id="name"
-                    placeholder="Ex: Promoção Natal 2024"
-                    value={newCampaign.name}
-                    onChange={(e) => setNewCampaign({...newCampaign, name: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="instance">Instância WhatsApp</Label>
-                  <Select 
-                    value={newCampaign.instanceId} 
-                    onValueChange={(value) => setNewCampaign({...newCampaign, instanceId: value})}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione uma instância" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableInstances.map((instance) => (
-                        <SelectItem key={instance.id} value={instance.id}>
-                          {instance.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="campaignName">Nome da Campanha</Label>
+                <Input
+                  id="campaignName"
+                  placeholder="ex: Promoção Black Friday"
+                  value={newCampaign.name}
+                  onChange={(e) => setNewCampaign({...newCampaign, name: e.target.value})}
+                />
               </div>
-
+              
               <div>
                 <Label htmlFor="message">Mensagem</Label>
                 <Textarea
                   id="message"
-                  placeholder="Digite sua mensagem... Use {{nome}} para personalizar"
+                  placeholder="Olá {{nome}}, temos uma oferta especial para você!"
                   value={newCampaign.message}
                   onChange={(e) => setNewCampaign({...newCampaign, message: e.target.value})}
                   rows={4}
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Use variáveis como {{nome}} para personalizar as mensagens
+                  Use {`{{nome}}`} para personalizar com o nome do contato
                 </p>
+              </div>
+              
+              <div>
+                <Label htmlFor="instance">Instância</Label>
+                <Select 
+                  value={newCampaign.instance_id} 
+                  onValueChange={(value) => setNewCampaign({...newCampaign, instance_id: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione uma instância conectada" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {instances.map((instance) => (
+                      <SelectItem key={instance.id} value={instance.id}>
+                        {instance.instance_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
-                <Label>Selecionar Contatos</Label>
-                <div className="grid grid-cols-2 gap-2 mt-2 max-h-32 overflow-y-auto border rounded-md p-2">
-                  {availableContacts.map((contact) => (
+                <Label>Selecionar Contatos ({selectedContacts.length} selecionados)</Label>
+                <div className="max-h-40 overflow-y-auto border rounded-md p-2 space-y-2">
+                  {contacts.map((contact) => (
                     <div key={contact.id} className="flex items-center space-x-2">
                       <Checkbox
                         id={contact.id}
-                        checked={newCampaign.selectedContacts.includes(contact.id)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setNewCampaign({
-                              ...newCampaign,
-                              selectedContacts: [...newCampaign.selectedContacts, contact.id]
-                            });
-                          } else {
-                            setNewCampaign({
-                              ...newCampaign,
-                              selectedContacts: newCampaign.selectedContacts.filter(id => id !== contact.id)
-                            });
-                          }
-                        }}
+                        checked={selectedContacts.includes(contact.id)}
+                        onCheckedChange={(checked) => 
+                          handleContactSelection(contact.id, checked as boolean)
+                        }
                       />
-                      <Label htmlFor={contact.id} className="text-sm">
-                        {contact.name}
-                      </Label>
+                      <label htmlFor={contact.id} className="text-sm flex-1 cursor-pointer">
+                        {contact.name} - {contact.phone}
+                      </label>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="date">Data de Envio</Label>
+                  <Label htmlFor="scheduledFor">Agendar para (opcional)</Label>
                   <Input
-                    id="date"
-                    type="date"
-                    value={newCampaign.scheduledDate}
-                    onChange={(e) => setNewCampaign({...newCampaign, scheduledDate: e.target.value})}
+                    id="scheduledFor"
+                    type="datetime-local"
+                    value={newCampaign.scheduled_for}
+                    onChange={(e) => setNewCampaign({...newCampaign, scheduled_for: e.target.value})}
                   />
                 </div>
+                
                 <div>
-                  <Label htmlFor="time">Horário</Label>
+                  <Label htmlFor="pauseBetween">Pausa entre mensagens (segundos)</Label>
                   <Input
-                    id="time"
-                    type="time"
-                    value={newCampaign.scheduledTime}
-                    onChange={(e) => setNewCampaign({...newCampaign, scheduledTime: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="delay">Pausa entre envios (seg)</Label>
-                  <Input
-                    id="delay"
+                    id="pauseBetween"
                     type="number"
                     min="1"
-                    max="60"
-                    value={newCampaign.sendDelay}
-                    onChange={(e) => setNewCampaign({...newCampaign, sendDelay: parseInt(e.target.value)})}
+                    value={newCampaign.pause_between_messages}
+                    onChange={(e) => setNewCampaign({...newCampaign, pause_between_messages: parseInt(e.target.value) || 5})}
                   />
                 </div>
               </div>
@@ -274,16 +381,32 @@ const CampaignsManager = () => {
         </Dialog>
       </div>
 
-      {/* Campaign Cards */}
+      {instances.length === 0 && (
+        <Card className="bg-yellow-50 border-yellow-200">
+          <CardContent className="p-4">
+            <p className="text-yellow-800">
+              ⚠️ Você precisa ter pelo menos uma instância conectada para criar campanhas.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {contacts.length === 0 && (
+        <Card className="bg-blue-50 border-blue-200">
+          <CardContent className="p-4">
+            <p className="text-blue-800">
+              ℹ️ Você precisa ter contatos cadastrados para criar campanhas.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {campaigns.map((campaign) => (
-          <Card key={campaign.id} className="relative">
+          <Card key={campaign.id}>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center space-x-2">
-                  <Send className="h-5 w-5" />
-                  <span className="text-lg">{campaign.name}</span>
-                </CardTitle>
+                <CardTitle className="text-lg">{campaign.name}</CardTitle>
                 <Badge className={getStatusColor(campaign.status)}>
                   {getStatusText(campaign.status)}
                 </Badge>
@@ -291,48 +414,40 @@ const CampaignsManager = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="text-sm text-gray-600">
-                <p className="truncate">
-                  <strong>Mensagem:</strong> {campaign.message.substring(0, 50)}...
-                </p>
-                <p><strong>Instância:</strong> {campaign.instanceId}</p>
-                <p><strong>Contatos:</strong> {campaign.selectedContacts.length}</p>
-                {campaign.scheduledDate && (
-                  <p>
-                    <strong>Agendado:</strong> {new Date(campaign.scheduledDate).toLocaleDateString('pt-BR')} às {campaign.scheduledTime}
-                  </p>
+                <p><strong>Instância:</strong> {campaign.instance?.instance_name}</p>
+                <p><strong>Contatos:</strong> {campaign.contact_ids.length}</p>
+                <p><strong>Pausa:</strong> {campaign.pause_between_messages}s</p>
+                {campaign.scheduled_for && (
+                  <p><strong>Agendado para:</strong> {formatDateTime(campaign.scheduled_for)}</p>
                 )}
-                <p><strong>Pausa:</strong> {campaign.sendDelay}s entre envios</p>
+                <p><strong>Criado em:</strong> {formatDateTime(campaign.created_at)}</p>
+              </div>
+
+              <div className="bg-gray-50 p-3 rounded text-sm">
+                <strong>Mensagem:</strong>
+                <p className="mt-1">{campaign.message.substring(0, 100)}...</p>
               </div>
 
               <div className="flex space-x-2">
-                {campaign.status === "draft" && (
-                  <>
-                    <Button size="sm" className="flex-1">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      Agendar
-                    </Button>
-                    <Button size="sm" variant="outline">
-                      <Settings className="h-4 w-4" />
-                    </Button>
-                  </>
-                )}
-                {campaign.status === "scheduled" && (
-                  <>
-                    <Button size="sm" variant="outline" className="flex-1">
-                      <Clock className="h-4 w-4 mr-2" />
-                      Reagendar
-                    </Button>
-                    <Button size="sm" variant="destructive">
-                      Cancelar
-                    </Button>
-                  </>
-                )}
-                {campaign.status === "completed" && (
+                {campaign.status === 'draft' && (
                   <Button size="sm" variant="outline" className="flex-1">
-                    <BarChart3 className="h-4 w-4 mr-2" />
-                    Ver Relatório
+                    <Edit className="h-4 w-4 mr-2" />
+                    Editar
                   </Button>
                 )}
+                {(campaign.status === 'draft' || campaign.status === 'scheduled') && (
+                  <Button size="sm" variant="outline" className="flex-1">
+                    <Send className="h-4 w-4 mr-2" />
+                    Enviar
+                  </Button>
+                )}
+                <Button 
+                  size="sm" 
+                  variant="destructive"
+                  onClick={() => handleDeleteCampaign(campaign.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
             </CardContent>
           </Card>

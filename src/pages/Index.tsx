@@ -1,10 +1,11 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, Users, Send, BarChart3, Plus, Settings, Calendar, Download } from "lucide-react";
+import { MessageSquare, Users, Send, BarChart3, Plus, Settings, Calendar } from "lucide-react";
+import { useAuth, AuthProvider } from "@/components/auth/AuthProvider";
 import LoginForm from "@/components/auth/LoginForm";
 import Dashboard from "@/components/dashboard/Dashboard";
 import InstancesManager from "@/components/instances/InstancesManager";
@@ -12,12 +13,20 @@ import ContactsManager from "@/components/contacts/ContactsManager";
 import CampaignsManager from "@/components/campaigns/CampaignsManager";
 import MessagesLog from "@/components/logs/MessagesLog";
 
-const Index = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+const MainApp = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
+  const { user, signOut, isLoading } = useAuth();
 
-  if (!isAuthenticated) {
-    return <LoginForm onLogin={() => setIsAuthenticated(true)} />;
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-blue-50">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginForm />;
   }
 
   return (
@@ -36,6 +45,9 @@ const Index = () => {
               <Badge variant="outline" className="text-green-600">
                 Online
               </Badge>
+              <span className="text-sm text-gray-600">
+                {user.email}
+              </span>
               <Button variant="outline" size="sm">
                 <Settings className="h-4 w-4 mr-2" />
                 Configurações
@@ -43,7 +55,7 @@ const Index = () => {
               <Button 
                 variant="ghost" 
                 size="sm"
-                onClick={() => setIsAuthenticated(false)}
+                onClick={signOut}
               >
                 Sair
               </Button>
@@ -100,6 +112,14 @@ const Index = () => {
         </Tabs>
       </main>
     </div>
+  );
+};
+
+const Index = () => {
+  return (
+    <AuthProvider>
+      <MainApp />
+    </AuthProvider>
   );
 };
 
