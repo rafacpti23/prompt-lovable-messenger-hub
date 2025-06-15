@@ -71,7 +71,9 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
   setSelectedInstanceId,
 }) => {
   // Só mostrar instâncias conectadas
-  const connectedInstances = instances.filter(inst => inst.status === "connected");
+  const connectedInstances = instances.filter(
+    inst => inst.status === "connected" || inst.status === "open"
+  );
 
   return (
     <Card>
