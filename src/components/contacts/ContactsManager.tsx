@@ -14,10 +14,14 @@ interface Contact {
   id: string; // Agora UUID
   name: string;
   phone: string;
-  group: string;
+  group?: string;
   created_at?: string;
+  updated_at?: string;
+  user_id?: string;
+  tags?: string[]; // keep for db compatibility
   [key: string]: any;
 }
+
 interface ContactsManagerProps {
   contacts: Contact[];
   setContacts: React.Dispatch<React.SetStateAction<Contact[]>>;
@@ -31,9 +35,9 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
   const { toast } = useToast();
 
   const filteredContacts = contacts.filter(contact =>
-    contact.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (contact.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     contact.phone?.includes(searchTerm) ||
-    contact.group?.toLowerCase().includes(searchTerm.toLowerCase())
+    (contact.group?.toLowerCase().includes(searchTerm.toLowerCase())))
   );
 
   const handleCreateGroup = (group: string) => {
@@ -73,7 +77,7 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
       user_id: user.id,
       name: newContact.name,
       phone: newContact.phone,
-      group: newContact.group,
+      tags: [newContact.group], // Store group in tags[0]
     };
 
     const { data, error } = await supabase.from("contacts").insert([insertObj]).select().single();
@@ -82,7 +86,7 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
       return;
     }
 
-    setContacts([data, ...contacts]);
+    setContacts([{ ...data, group: data.tags?.[0] || "" }, ...contacts]);
     setNewContact({ name: "", phone: "", group: "" });
     toast({
       title: "Contato adicionado",
@@ -198,7 +202,7 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
                       <p className="font-medium">{contact.name}</p>
                       <p className="text-sm text-gray-500">{contact.phone}</p>
                     </div>
-                    {contact.group && (
+                    {contact.group && contact.group !== "" && (
                       <Badge variant="outline">{contact.group}</Badge>
                     )}
                   </div>
@@ -221,4 +225,3 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
 };
 
 export default ContactsManager;
-

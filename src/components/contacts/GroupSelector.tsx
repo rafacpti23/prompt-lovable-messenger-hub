@@ -20,7 +20,6 @@ const GroupSelector: React.FC<GroupSelectorProps> = ({ groups, value, onChange, 
     if (val === "__new__") {
       setCreating(true);
       setTimeout(() => {
-        // focus input
         document.getElementById("new-group-input")?.focus();
       }, 100);
     } else {
@@ -64,10 +63,10 @@ const GroupSelector: React.FC<GroupSelectorProps> = ({ groups, value, onChange, 
         <SelectValue placeholder="Escolha um grupo" />
       </SelectTrigger>
       <SelectContent>
-        {groups.length === 0 && <SelectItem value="" disabled>Nenhum grupo</SelectItem>}
-        {groups.map((group) => (
-          <SelectItem key={group} value={group}>{group}</SelectItem>
-        ))}
+        {/* Only map groups with real, non-empty values */}
+        {groups.map((group) =>
+          group ? <SelectItem key={group} value={group}>{group}</SelectItem> : null
+        )}
         <SelectItem value="__new__" className="text-green-700">+ Criar novo grupo...</SelectItem>
       </SelectContent>
     </Select>

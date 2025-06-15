@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,8 +12,7 @@ import InstancesManager from "@/components/instances/InstancesManager";
 import ContactsManager from "@/components/contacts/ContactsManager";
 import CampaignsManager from "@/components/campaigns/CampaignsManager";
 import SettingsModal from "@/components/settings/SettingsModal";
-
-// NENHUMA referência a MessagesLog a partir daqui.
+import { supabase } from "@/integrations/supabase/client"; // <-- Fix import here
 
 const MainApp = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -23,8 +23,10 @@ const MainApp = () => {
   const [contacts, setContacts] = useState<any[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(true);
 
-  // Derivar os grupos únicos dos contatos
-  const groups = Array.from(new Set(contacts.map(c => c.group).filter(Boolean)));
+  // Derivar os grupos únicos dos contatos (considerar grupo == tags[0] ou similar)
+  const groups = Array.from(
+    new Set(contacts.map(c => c.group).filter(Boolean))
+  );
 
   let user, signOut, isLoading, error;
   let contextError = null;
@@ -39,7 +41,6 @@ const MainApp = () => {
     contextError = e;
   }
 
-  // Carregar contatos reais do Supabase
   useEffect(() => {
     async function fetchContacts() {
       setLoadingContacts(true);
@@ -49,7 +50,15 @@ const MainApp = () => {
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
-      if (!error) setContacts(data || []);
+      if (!error) {
+        // Assegura que cada contato terá o campo .group, extraído de tags[0] se presente
+        setContacts(
+          (data || []).map((c: any) => ({
+            ...c,
+            group: c.tags?.[0] || "", // group calculated from tags[0]
+          }))
+        );
+      }
       setLoadingContacts(false);
     }
     if (user) fetchContacts();
@@ -158,11 +167,9 @@ const MainApp = () => {
           <TabsContent value="dashboard">
             <Dashboard />
           </TabsContent>
-
           <TabsContent value="instances">
             <InstancesManager />
           </TabsContent>
-
           <TabsContent value="contacts">
             <ContactsManager
               contacts={contacts}
@@ -172,7 +179,6 @@ const MainApp = () => {
               user={user}
             />
           </TabsContent>
-
           <TabsContent value="campaigns">
             <CampaignsManager
               contactGroups={groups}
@@ -180,10 +186,9 @@ const MainApp = () => {
           </TabsContent>
         </Tabs>
       </main>
-
-      <SettingsModal 
-        open={showSettings} 
-        onOpenChange={setShowSettings} 
+      <SettingsModal
+        open={showSettings}
+        onOpenChange={setShowSettings}
       />
     </div>
   );
