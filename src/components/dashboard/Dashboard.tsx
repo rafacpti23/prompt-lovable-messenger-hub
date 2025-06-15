@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3, MessageSquare, Users, Send, Zap } from "lucide-react";
@@ -9,7 +8,9 @@ import { supabase } from "@/integrations/supabase/client";
 
 // Função utilitária para verificar se o cron job está ativo
 async function isCampaignCronEnabled() {
-  const { data, error } = await supabase.rpc("cron_get_job", { job_name: "dispatch-campaign-messages" });
+  // Define o tipo esperado de retorno para o RPC
+  type CronJobResult = { active: boolean } | null;
+  const { data, error } = await supabase.rpc<CronJobResult>("cron_get_job", { job_name: "dispatch-campaign-messages" });
   // Se não tiver a função, sempre retorna desabilitado.
   if (error || !data) return false;
   return data.active === true;
