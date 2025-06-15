@@ -13,9 +13,8 @@ interface CampaignDB {
   name: string;
   message: string;
   status: string;
-  sent: number;
-  total: number;
   created_at?: string;
+  // removido sent e total pois não existem no banco
 }
 
 interface CampaignsManagerProps {
@@ -67,14 +66,12 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         });
         return;
       }
-      // Adaptar dados reais para uso local
+      // Adaptar dados reais para uso local (sem sent/total)
       const formatted = (data || []).map((c: any) => ({
         id: c.id,
         name: c.name,
         message: c.message,
         status: c.status || "draft",
-        sent: 0,
-        total: 0,
         created_at: c.created_at,
       }));
       setCampaigns(formatted);
@@ -117,12 +114,11 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       name: newCampaign.name,
       message: newCampaign.message,
       status: "draft",
-      sent: 0,
-      total: 0,
-      // outros campos obrigatórios do banco aqui, se faltarem!
+      // sent: 0, // REMOVIDO pois não existe
+      // total: 0, // REMOVIDO pois não existe
       instance_id: "00000000-0000-0000-0000-000000000000", // Ajuste conforme necessário!
       contact_ids: [],
-      // schedule fields omitidos pois não existem no schema do banco
+      // agendamento/schedule não existem no banco real
     };
 
     const { data, error } = await supabase
@@ -154,8 +150,6 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         name: data.name,
         message: data.message,
         status: data.status || "draft",
-        sent: 0,
-        total: 0,
         created_at: data.created_at,
       },
       ...prev,
@@ -248,7 +242,6 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       {/* Lista de Campanhas */}
       <CampaignList
         campaigns={campaigns}
-        // Corrigir o tipo do delete para string
         deleteCampaign={deleteCampaign}
         getStatusColor={getStatusColor}
         getStatusText={getStatusText}
