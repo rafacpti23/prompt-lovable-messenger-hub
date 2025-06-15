@@ -2,9 +2,9 @@ import { useState, useEffect } from "react";
 import { Send } from "lucide-react";
 import CampaignForm from "./CampaignForm";
 import CampaignList from "./CampaignList";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
+import { useInstanceList } from "@/hooks/useInstanceList";
+import { useCampaignList } from "@/hooks/useCampaignList";
 
 // Tipos baseados no schema real do banco
 interface CampaignDB {
@@ -32,7 +32,6 @@ interface CampaignsManagerProps {
 const GOOGLE_STORAGE_KEY = "googleContactsSheetId";
 
 const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) => {
-  const [campaigns, setCampaigns] = useState<CampaignDB[]>([]);
   const [newCampaign, setNewCampaign] = useState({ name: "", message: "" });
   const [contactSource, setContactSource] = useState<"supabase" | "google">("supabase");
   const [googleConnected, setGoogleConnected] = useState<boolean>(false);
@@ -42,11 +41,13 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
   const [scheduleTime, setScheduleTime] = useState("");
   const [recurringInterval, setRecurringInterval] = useState<number>(7);
   const [selectedGroup, setSelectedGroup] = useState("Todos os contatos");
-  const [instances, setInstances] = useState<Instance[]>([]);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string>("");
 
   const { toast } = useToast();
-  const { user } = useAuth();
+
+  // hooks customizados
+  const { instances } = useInstanceList();
+  const { campaigns, setCampaigns } = useCampaignList(toast);
 
   // Grupos disponíveis
   const supabaseGroups = contactGroups.length > 0 ? contactGroups : ["Todos os contatos"];
@@ -60,61 +61,12 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     }
   }, []);
 
-  // Buscar instâncias do usuário logado
+  // Seleciona instância automaticamente se houver alguma
   useEffect(() => {
-    async function fetchInstances() {
-      if (!user) return;
-      const { data, error } = await supabase
-        .from("instances")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-      if (!error && data) {
-        setInstances(
-          data.map((inst: any) => ({
-            id: inst.id,
-            instance_name: inst.instance_name,
-            status: inst.status,
-          }))
-        );
-        // Seleciona automaticamente a primeira instância se houver alguma
-        if (data.length > 0) setSelectedInstanceId(data[0].id);
-      }
+    if (instances.length > 0) {
+      setSelectedInstanceId(instances[0].id);
     }
-    fetchInstances();
-  }, [user]);
-
-  // Buscar campanhas reais do Supabase
-  useEffect(() => {
-    async function fetchCampaigns() {
-      if (!user) return;
-      const { data, error } = await supabase
-        .from("campaigns")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-      if (error) {
-        toast({
-          title: "Erro ao buscar campanhas",
-          description: error.message,
-          variant: "destructive",
-        });
-        return;
-      }
-      // Adiciona sent e total como 0 para compatibilizar o tipo exigido pela CampaignList
-      const formatted = (data || []).map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        message: c.message,
-        status: c.status || "draft",
-        created_at: c.created_at,
-        sent: 0,
-        total: 0,
-      }));
-      setCampaigns(formatted);
-    }
-    fetchCampaigns();
-  }, [user, toast]);
+  }, [instances]);
 
   const handleConnectGoogle = () => {
     const fakeSheetId = "MinhaPlanilhaContatosGoogle";
@@ -136,6 +88,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       });
       return;
     }
+    const user = instances[0]?.user_id; // O user_id não é mais pego pelo useAuth, então depende do Instance (pode ajustar isso se necessário)
     if (!user) {
       toast({
         title: "Erro de autenticação",
@@ -152,22 +105,20 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       });
       return;
     }
-
     const insertObj: any = {
-      user_id: user.id,
+      user_id: user,
       name: newCampaign.name,
       message: newCampaign.message,
       status: "draft",
       instance_id: selectedInstanceId,
       contact_ids: [],
     };
-
+    const { supabase } = await import("@/integrations/supabase/client");
     const { data, error } = await supabase
       .from("campaigns")
       .insert([insertObj])
       .select()
       .single();
-
     if (error) {
       toast({
         title: "Erro",
@@ -176,15 +127,12 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       });
       return;
     }
-
     setNewCampaign({ name: "", message: "" });
     setSelectedGroup("Todos os contatos");
-
     toast({
       title: "Campanha criada",
       description: `Campanha ${newCampaign.name} criada com sucesso`,
     });
-
     setCampaigns(prev => [
       {
         id: data.id,
@@ -199,8 +147,8 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     ]);
   };
 
-  // Parâmetro id: string (UUID)
   const deleteCampaign = async (id: string) => {
+    const { supabase } = await import("@/integrations/supabase/client");
     const { error } = await supabase.from("campaigns").delete().eq("id", id);
     if (error) {
       toast({
@@ -210,7 +158,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       });
       return;
     }
-    setCampaigns(campaigns.filter(campaign => campaign.id !== id));
+    setCampaigns((prev: any) => prev.filter((campaign: any) => campaign.id !== id));
     toast({
       title: "Campanha removida",
       description: "Campanha deletada com sucesso",
@@ -255,8 +203,6 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
           <h2 className="text-2xl font-bold text-gray-900">Gerenciar Campanhas</h2>
         </div>
       </div>
-
-      {/* Criar Nova Campanha */}
       <CampaignForm
         newCampaign={newCampaign}
         setNewCampaign={setNewCampaign}
@@ -284,8 +230,6 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         selectedInstanceId={selectedInstanceId}
         setSelectedInstanceId={setSelectedInstanceId}
       />
-
-      {/* Lista de Campanhas */}
       <CampaignList
         campaigns={campaigns}
         deleteCampaign={deleteCampaign}
