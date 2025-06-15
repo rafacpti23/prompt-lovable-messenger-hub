@@ -40,7 +40,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
   const [recurringInterval, setRecurringInterval] = useState<number>(7);
   const [selectedGroup, setSelectedGroup] = useState("Todos os contatos");
   const [selectedInstanceId, setSelectedInstanceId] = useState<string>("");
-  const [instances, setInstances] = useState<Instance[]>([]); // STATUS atualizado
+  const [instances, setInstances] = useState<Instance[]>([]);
   const [loadingInstances, setLoadingInstances] = useState(true);
 
   const { toast } = useToast();
@@ -137,15 +137,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       });
       return;
     }
-    const user = instances[0]?.user_id; // O user_id não é mais pego pelo useAuth, então depende do Instance (pode ajustar isso se necessário)
-    if (!user) {
-      toast({
-        title: "Erro de autenticação",
-        description: "É necessário estar logado para criar campanha.",
-        variant: "destructive",
-      });
-      return;
-    }
+
     if (!selectedInstanceId) {
       toast({
         title: "Selecione uma instância",
@@ -154,50 +146,117 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       });
       return;
     }
-    const insertObj: any = {
-      user_id: user,
-      name: newCampaign.name,
-      message: newCampaign.message,
-      status: "draft",
-      instance_id: selectedInstanceId,
-      contact_ids: [],
-    };
-    const { supabase } = await import("@/integrations/supabase/client");
-    const { data, error } = await supabase
-      .from("campaigns")
-      .insert([insertObj])
-      .select()
-      .single();
-    if (error) {
+
+    try {
+      // Primeiro busca o usuário atual
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Erro de autenticação",
+          description: "É necessário estar logado para criar campanha.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Busca todos os contatos do usuário para popular contact_ids
+      const { data: contacts, error: contactsError } = await supabase
+        .from("contacts")
+        .select("id")
+        .eq("user_id", user.id);
+
+      if (contactsError) {
+        toast({
+          title: "Erro ao buscar contatos",
+          description: contactsError.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const contactIds = contacts ? contacts.map(c => c.id) : [];
+
+      if (contactIds.length === 0) {
+        toast({
+          title: "Nenhum contato encontrado",
+          description: "Adicione contatos antes de criar uma campanha.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const insertObj = {
+        user_id: user.id,
+        name: newCampaign.name,
+        message: newCampaign.message,
+        status: "draft",
+        instance_id: selectedInstanceId,
+        contact_ids: contactIds,
+      };
+
+      const { data, error } = await supabase
+        .from("campaigns")
+        .insert([insertObj])
+        .select()
+        .single();
+
+      if (error) {
+        toast({
+          title: "Erro",
+          description: `Erro ao criar campanha: ${error.message}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Criar scheduled_messages para cada contato
+      const scheduledMessages = contactIds.map(contactId => ({
+        campaign_id: data.id,
+        contact_id: contactId,
+        phone: "", // Será preenchido pela Edge Function
+        message: newCampaign.message,
+        scheduled_for: new Date().toISOString(),
+      }));
+
+      const { error: scheduleError } = await supabase
+        .from("scheduled_messages")
+        .insert(scheduledMessages);
+
+      if (scheduleError) {
+        console.warn("Erro ao criar mensagens agendadas:", scheduleError);
+      }
+
+      setNewCampaign({ name: "", message: "" });
+      setSelectedGroup("Todos os contatos");
+      
+      toast({
+        title: "Campanha criada",
+        description: `Campanha ${newCampaign.name} criada com ${contactIds.length} contatos`,
+      });
+
+      setCampaigns(prev => [
+        {
+          id: data.id,
+          name: data.name,
+          message: data.message,
+          status: data.status || "draft",
+          created_at: data.created_at,
+          sent: 0,
+          total: contactIds.length,
+        },
+        ...prev,
+      ]);
+
+    } catch (err: any) {
       toast({
         title: "Erro",
-        description: `Erro ao criar campanha: ${error.message}`,
+        description: `Erro inesperado: ${err.message}`,
         variant: "destructive",
       });
-      return;
     }
-    setNewCampaign({ name: "", message: "" });
-    setSelectedGroup("Todos os contatos");
-    toast({
-      title: "Campanha criada",
-      description: `Campanha ${newCampaign.name} criada com sucesso`,
-    });
-    setCampaigns(prev => [
-      {
-        id: data.id,
-        name: data.name,
-        message: data.message,
-        status: data.status || "draft",
-        created_at: data.created_at,
-        sent: 0,
-        total: 0,
-      },
-      ...prev,
-    ]);
   };
 
   const deleteCampaign = async (id: string) => {
-    const { supabase } = await import("@/integrations/supabase/client");
     const { error } = await supabase.from("campaigns").delete().eq("id", id);
     if (error) {
       toast({
@@ -246,7 +305,6 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
 
   // NOVA FUNÇÃO: Iniciar campanha (atualiza status para "scheduled")
   const startCampaign = async (id: string) => {
-    const { supabase } = await import("@/integrations/supabase/client");
     const { error } = await supabase
       .from("campaigns")
       .update({ status: "scheduled" })
@@ -264,11 +322,10 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     );
     toast({
       title: "Campanha iniciada",
-      description: "A campanha foi marcada como agendada. O disparo será feito conforme agendamento.",
+      description: "A campanha foi marcada como agendada. Use o botão 'Testar Disparo' no Dashboard para enviar as mensagens.",
     });
   };
 
-  // Copiado/Adaptado para exibir o status EXATO da instância ao selecionar campanha
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -309,7 +366,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         deleteCampaign={deleteCampaign}
         getStatusColor={getStatusColor}
         getStatusText={getStatusText}
-        onStartCampaign={startCampaign}  // <--- PASSAMOS AQUI!
+        onStartCampaign={startCampaign}
       />
     </div>
   );
