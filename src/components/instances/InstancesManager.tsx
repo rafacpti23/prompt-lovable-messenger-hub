@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MessageSquare, Plus, QrCode, Trash2, Power } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import InstanceQrModal from "./InstanceQrModal";
 import {
   createInstance as createInstanceApi,
   isApiConfigured,
@@ -141,6 +141,7 @@ const InstancesManager = () => {
 
   const handleShowQr = async (instanceName: string) => {
     try {
+      // Retorna data.base64 (pode vir já com o prefixo ou não)
       const qrBase64 = await getQrCode(instanceName);
       setQrModal({ open: true, instanceName, qrBase64 });
     } catch (error: any) {
@@ -149,6 +150,7 @@ const InstancesManager = () => {
         description: error?.message || "Falha ao buscar QR Code.",
         variant: "destructive",
       });
+      setQrModal({ open: true, instanceName, qrBase64: undefined });
     }
   };
 
@@ -197,24 +199,13 @@ const InstancesManager = () => {
 
   return (
     <div className="space-y-6">
-      <Dialog open={qrModal.open} onOpenChange={v => setQrModal({ open: v })}>
-        <DialogContent className="sm:max-w-xs flex flex-col items-center">
-          <DialogHeader>
-            <DialogTitle>QR Code - {qrModal.instanceName}</DialogTitle>
-          </DialogHeader>
-          {qrModal.qrBase64 ? (
-            <img
-              src={`data:image/png;base64,${qrModal.qrBase64}`}
-              alt="QR Code"
-              className="w-56 h-56 object-contain border rounded mx-auto"
-            />
-          ) : (
-            <div className="w-56 h-56 flex items-center justify-center text-gray-400">
-              Nenhum QR code gerado.
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+
+      <InstanceQrModal
+        open={qrModal.open}
+        instanceName={qrModal.instanceName}
+        qrBase64={qrModal.qrBase64}
+        onOpenChange={open => setQrModal(v => ({ ...v, open }))}
+      />
 
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
