@@ -1,0 +1,194 @@
+
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { useToast } from "@/hooks/use-toast";
+import {
+  createInstance as createInstanceApi,
+  isApiConfigured,
+  getApiConfig,
+  getQrCode,
+  connectInstance,
+  deleteInstance as deleteInstanceApi,
+} from "@/services/evolutionApi";
+
+export interface Instance {
+  id: string;
+  instance_name: string;
+  status: string | null;
+  user_id: string;
+  phone_number?: string | null;
+  qr_code?: string | null;
+}
+
+export function useManageInstances() {
+  const [instances, setInstances] = useState<Instance[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  // Fetch instances from Supabase
+  const fetchInstances = useCallback(async () => {
+    setLoading(true);
+    if (!user) {
+      setInstances([]);
+      setLoading(false);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("instances")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+    if (!error && data) {
+      setInstances(data);
+    }
+    setLoading(false);
+  }, [user]);
+
+  // Setup realtime listener for 'instances'
+  useEffect(() => {
+    fetchInstances();
+    if (!user) return;
+    const channel = supabase
+      .channel("public:instances")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "instances", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          fetchInstances();
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, fetchInstances]);
+
+  // Helper para atualizar instância
+  const updateInstance = useCallback(async (instanceId: string, data: any) => {
+    await supabase
+      .from("instances")
+      .update(data)
+      .eq("id", instanceId);
+  }, []);
+
+  // Criar instância
+  const createInstance = async (newInstanceName: string) => {
+    if (!newInstanceName.trim()) {
+      toast({
+        title: "Erro",
+        description: "Nome da instância é obrigatório",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!isApiConfigured()) {
+      toast({
+        title: "Configuração faltando",
+        description: "Configure a URL da API e a API Key nas Configurações.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!user) {
+      toast({
+        title: "Precisa estar logado",
+        description: "Faça login para criar uma instância.",
+        variant: "destructive",
+      });
+      return;
+    }
+    // Registra na Evolution API
+    await createInstanceApi(newInstanceName);
+
+    // Insere no Supabase
+    const { error: insertError } = await supabase.from("instances").insert([
+      {
+        instance_name: newInstanceName,
+        user_id: user.id,
+        integration: "WHATSAPP-BAILEYS",
+        status: "disconnected"
+      },
+    ]);
+    if (insertError) {
+      toast({
+        title: "Erro ao criar instância no Supabase",
+        description: insertError.message,
+        variant: "destructive",
+      });
+      return;
+    }
+    toast({
+      title: "Instância criada com sucesso!",
+      description: `Instância ${newInstanceName} criada.`,
+    });
+    fetchInstances();
+  };
+
+  // Conectar instância (API + atualizar no Supabase)
+  const connect = async (instance: Instance) => {
+    try {
+      const response = await connectInstance(instance.instance_name);
+      if (response?.status) {
+        await updateInstance(instance.id, { status: response.status });
+      }
+      toast({
+        title: "Solicitação de conexão enviada!",
+        description: "Aguarde o status atualizar.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao conectar",
+        description: error?.message || "Falha ao conectar instância.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Mostrar QR Code (API + atualizar no Supabase)
+  const showQr = async (instance: Instance, setQrModal: (v: any) => void) => {
+    try {
+      const qrBase64 = await getQrCode(instance.instance_name);
+      await updateInstance(instance.id, {
+        qr_code: qrBase64 || null,
+        status: "pending",
+      });
+      setQrModal({ open: true, instanceName: instance.instance_name, qrBase64 });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao buscar QR Code",
+        description: error?.message || "Falha ao buscar QR Code.",
+        variant: "destructive",
+      });
+      setQrModal({ open: true, instanceName: instance.instance_name, qrBase64: undefined });
+    }
+  };
+
+  // Deletar instância
+  const remove = async (instance: Instance) => {
+    try {
+      await deleteInstanceApi(instance.instance_name);
+      await supabase.from("instances").delete().eq("id", instance.id);
+      toast({
+        title: "Instância removida",
+        description: "Instância deletada com sucesso",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao deletar instância",
+        description: error?.message || "Falha ao deletar instância.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return {
+    instances,
+    loading,
+    createInstance,
+    connect,
+    showQr,
+    remove,
+  };
+}
