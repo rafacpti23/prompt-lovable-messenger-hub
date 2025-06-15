@@ -46,8 +46,26 @@ const InstancesManager = () => {
       };
       const res = await fetch(`${apiUrl}/instance/fetchInstances`, { headers });
       if (!res.ok) throw new Error("Falha ao buscar instâncias");
-      const json = await res.json();
-      setInstances(json?.instances || []);
+      const responseJson = await res.json();
+
+      // ARRUMANDO O MAPEAMENTO PARA O FORMATO INTERNO esperado
+      let instanceArray: any[] = [];
+      // Se for array, ótimo. Se for objeto {instances: [...]}, também aceita.
+      if (Array.isArray(responseJson)) {
+        instanceArray = responseJson;
+      } else if (responseJson?.instances && Array.isArray(responseJson.instances)) {
+        instanceArray = responseJson.instances;
+      }
+
+      // Mapear para Instance
+      const parsedInstances: Instance[] = instanceArray.map((i: any) => ({
+        instanceId: i.instanceId || i.id || "",                  // busca o id, instanceId
+        instanceName: i.instanceName || i.name || "",            // busca o name, instanceName
+        status: i.status || i.connectionStatus || "unknown",     // busca o status, connectionStatus
+        number: i.number || null,
+      }));
+
+      setInstances(parsedInstances);
     } catch (err: any) {
       toast({
         title: "Erro",
