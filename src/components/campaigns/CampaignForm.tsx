@@ -70,10 +70,11 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
   selectedInstanceId,
   setSelectedInstanceId,
 }) => {
-  // Só mostrar instâncias conectadas
-  const connectedInstances = instances.filter(
-    inst => inst.status === "connected" || inst.status === "open"
-  );
+  // Removido o filtro, mostra todas as instâncias do Supabase
+  // const connectedInstances = instances.filter(
+  //   inst => inst.status === "connected" || inst.status === "open"
+  // );
+  // Usar diretamente o array instances recebido por prop:
 
   return (
     <Card>
@@ -93,12 +94,12 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
               value={selectedInstanceId}
               onChange={e => setSelectedInstanceId(e.target.value)}
             >
-              {connectedInstances.length === 0 && (
-                <option value="">Nenhuma instância conectada</option>
+              {instances.length === 0 && (
+                <option value="">Nenhuma instância cadastrada</option>
               )}
-              {connectedInstances.map((inst) => (
+              {instances.map((inst) => (
                 <option value={inst.id} key={inst.id}>
-                  {inst.instance_name} (Conectada)
+                  {inst.instance_name} {inst.status === "connected" || inst.status === "open" ? "(Conectada)" : "(Desconectada)"}
                 </option>
               ))}
             </select>

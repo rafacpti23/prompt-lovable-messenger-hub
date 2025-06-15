@@ -84,6 +84,16 @@ const InstancesManager = () => {
     // eslint-disable-next-line
   }, []);
 
+  // Helper para atualizar Supabase
+  const updateInstanceSupabase = async (instanceName: string, data: any) => {
+    if (!user) return;
+    await supabase
+      .from("instances")
+      .update(data)
+      .eq("instance_name", instanceName)
+      .eq("user_id", user.id);
+  };
+
   const handleCreateInstance = async () => {
     if (!newInstanceName.trim()) {
       toast({
@@ -148,7 +158,11 @@ const InstancesManager = () => {
 
   const handleConnect = async (instanceName: string) => {
     try {
-      await connectInstance(instanceName);
+      const response = await connectInstance(instanceName);
+      // Atualizar no Supabase o status, caso possível (vai depender do retorno da API)
+      if (response?.status) {
+        await updateInstanceSupabase(instanceName, { status: response.status });
+      }
       toast({
         title: "Solicitação de conexão enviada!",
         description: `Aguarde o status atualizar.`,
@@ -166,7 +180,16 @@ const InstancesManager = () => {
   const handleShowQr = async (instanceName: string) => {
     try {
       const qrBase64 = await getQrCode(instanceName);
+
+      // Não temos o número, mas podemos já marcar como "pending" ou manter "disconnected" se quiser.
+      await updateInstanceSupabase(instanceName, {
+        qr_code: qrBase64 || null,
+        status: "pending",
+      });
+
       setQrModal({ open: true, instanceName, qrBase64 });
+      // Aqui, em um sistema ideal, após escanear o QR, deveríamos ouvir por evento/status
+      // Entretanto, só atualizamos para "pending" ao exibir o QR.
     } catch (error: any) {
       toast({
         title: "Erro ao buscar QR Code",
