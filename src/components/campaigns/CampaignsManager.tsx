@@ -14,7 +14,10 @@ interface CampaignDB {
   message: string;
   status: string;
   created_at?: string;
-  // removido sent e total pois não existem no banco
+  // Os campos `sent` e `total` não existem no banco,
+  // mas são exigidos pelo CampaignList como parte da tipagem `Campaign`.
+  sent?: number;
+  total?: number;
 }
 
 interface CampaignsManagerProps {
@@ -66,13 +69,15 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         });
         return;
       }
-      // Adaptar dados reais para uso local (sem sent/total)
+      // Adiciona sent e total como 0 para compatibilizar o tipo exigido pela CampaignList
       const formatted = (data || []).map((c: any) => ({
         id: c.id,
         name: c.name,
         message: c.message,
         status: c.status || "draft",
         created_at: c.created_at,
+        sent: 0,
+        total: 0,
       }));
       setCampaigns(formatted);
     }
@@ -114,11 +119,8 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       name: newCampaign.name,
       message: newCampaign.message,
       status: "draft",
-      // sent: 0, // REMOVIDO pois não existe
-      // total: 0, // REMOVIDO pois não existe
       instance_id: "00000000-0000-0000-0000-000000000000", // Ajuste conforme necessário!
       contact_ids: [],
-      // agendamento/schedule não existem no banco real
     };
 
     const { data, error } = await supabase
@@ -151,6 +153,9 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         message: data.message,
         status: data.status || "draft",
         created_at: data.created_at,
+        // Adiciona sempre sent: 0 e total: 0 para uso no CampaignList
+        sent: 0,
+        total: 0,
       },
       ...prev,
     ]);
