@@ -12,9 +12,11 @@ import InstancesManager from "@/components/instances/InstancesManager";
 import ContactsManager from "@/components/contacts/ContactsManager";
 import CampaignsManager from "@/components/campaigns/CampaignsManager";
 import MessagesLog from "@/components/logs/MessagesLog";
+import SettingsModal from "@/components/settings/SettingsModal";
 
 const MainApp = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [showSettings, setShowSettings] = useState(false);
   const { user, signOut, isLoading } = useAuth();
 
   if (isLoading) {
@@ -48,7 +50,11 @@ const MainApp = () => {
               <span className="text-sm text-gray-600">
                 {user.email}
               </span>
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowSettings(true)}
+              >
                 <Settings className="h-4 w-4 mr-2" />
                 Configurações
               </Button>
@@ -111,6 +117,11 @@ const MainApp = () => {
           </TabsContent>
         </Tabs>
       </main>
+
+      <SettingsModal 
+        open={showSettings} 
+        onOpenChange={setShowSettings} 
+      />
     </div>
   );
 };
