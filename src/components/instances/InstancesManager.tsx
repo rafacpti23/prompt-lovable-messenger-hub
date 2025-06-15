@@ -15,6 +15,8 @@ import {
   connectInstance,
   deleteInstance as deleteInstanceApi,
 } from "@/services/evolutionApi";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 type Instance = {
   instanceId: string;
@@ -30,6 +32,7 @@ const InstancesManager = () => {
   const [loadingInstances, setLoadingInstances] = useState(false);
   const [qrModal, setQrModal] = useState<{ open: boolean; instanceName?: string; qrBase64?: string }>({ open: false });
   const { toast } = useToast();
+  const { user } = useAuth();
 
   // Carrega as instâncias reais da Evolution API
   const fetchInstances = async () => {
@@ -48,20 +51,17 @@ const InstancesManager = () => {
       if (!res.ok) throw new Error("Falha ao buscar instâncias");
       const responseJson = await res.json();
 
-      // ARRUMANDO O MAPEAMENTO PARA O FORMATO INTERNO esperado
       let instanceArray: any[] = [];
-      // Se for array, ótimo. Se for objeto {instances: [...]}, também aceita.
       if (Array.isArray(responseJson)) {
         instanceArray = responseJson;
       } else if (responseJson?.instances && Array.isArray(responseJson.instances)) {
         instanceArray = responseJson.instances;
       }
 
-      // Mapear para Instance
       const parsedInstances: Instance[] = instanceArray.map((i: any) => ({
-        instanceId: i.instanceId || i.id || "",                  // busca o id, instanceId
-        instanceName: i.instanceName || i.name || "",            // busca o name, instanceName
-        status: i.status || i.connectionStatus || "unknown",     // busca o status, connectionStatus
+        instanceId: i.instanceId || i.id || "",
+        instanceName: i.instanceName || i.name || "",
+        status: i.status || i.connectionStatus || "unknown",
         number: i.number || null,
       }));
 
@@ -101,10 +101,34 @@ const InstancesManager = () => {
       });
       return;
     }
+    if (!user) {
+      toast({
+        title: "Precisa estar logado",
+        description: "Faça login para criar uma instância.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsCreating(true);
     try {
       await createInstanceApi(newInstanceName);
+
+      const { error: insertError } = await supabase
+        .from("instances")
+        .insert([
+          {
+            instance_name: newInstanceName,
+            user_id: user.id,
+            integration: "WHATSAPP-BAILEYS",
+            status: "disconnected", // status inicial padrão
+            // Nenhuma phone_number ou qr_code neste momento
+          },
+        ]);
+      if (insertError) {
+        throw new Error("Erro ao inserir a instância no Supabase: " + insertError.message);
+      }
+
       toast({
         title: "Instância criada com sucesso!",
         description: `Instância ${newInstanceName} criada.`,
@@ -114,7 +138,7 @@ const InstancesManager = () => {
     } catch (error: any) {
       toast({
         title: "Erro ao criar instância",
-        description: error?.message || "Falha ao criar instância via Evolution API.",
+        description: error?.message || "Falha ao criar instância via Evolution API/Supabase.",
         variant: "destructive",
       });
     } finally {
@@ -141,7 +165,6 @@ const InstancesManager = () => {
 
   const handleShowQr = async (instanceName: string) => {
     try {
-      // Retorna data.base64 (pode vir já com o prefixo ou não)
       const qrBase64 = await getQrCode(instanceName);
       setQrModal({ open: true, instanceName, qrBase64 });
     } catch (error: any) {
