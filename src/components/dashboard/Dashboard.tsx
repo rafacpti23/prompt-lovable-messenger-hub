@@ -1,8 +1,8 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, MessageSquare, Users, Send, Zap } from "lucide-react";
+import { BarChart3, MessageSquare, Users, Send, Zap, Play } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { useMessagesByDay } from "@/hooks/useMessagesByDay";
@@ -32,6 +32,44 @@ async function enableCampaignCron(enable: boolean) {
       title: "Agendamento automático desativado",
       description: "O job pg_cron foi desativado e não irá mais disparar campanhas automaticamente.",
       variant: "default",
+    });
+  }
+}
+
+// Função para testar disparo manual de campanha
+async function testCampaignDispatch() {
+  try {
+    toast({
+      title: "Disparando campanha...",
+      description: "Testando envio manual da campanha.",
+    });
+
+    const { data, error } = await supabase.functions.invoke('campaign-dispatcher', {
+      body: {}
+    });
+
+    if (error) {
+      console.error('Erro ao disparar campanha:', error);
+      toast({
+        title: "Erro no disparo",
+        description: `Erro: ${error.message}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    console.log('Resposta do disparo:', data);
+    toast({
+      title: "Disparo executado",
+      description: "Verifique os logs da Edge Function para detalhes.",
+      variant: "default",
+    });
+  } catch (err: any) {
+    console.error('Erro no teste de disparo:', err);
+    toast({
+      title: "Erro no teste",
+      description: `Erro: ${err.message}`,
+      variant: "destructive",
     });
   }
 }
@@ -89,6 +127,15 @@ const Dashboard = () => {
           <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
         </div>
         <div className="flex items-center space-x-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={testCampaignDispatch}
+            className="flex items-center space-x-2"
+          >
+            <Play className="h-4 w-4" />
+            <span>Testar Disparo</span>
+          </Button>
           <Zap className="h-5 w-5 text-yellow-500" />
           <Switch
             checked={cronEnabled}
