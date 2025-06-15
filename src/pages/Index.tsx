@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,8 @@ import ContactsManager from "@/components/contacts/ContactsManager";
 import CampaignsManager from "@/components/campaigns/CampaignsManager";
 import SettingsModal from "@/components/settings/SettingsModal";
 
+// NENHUMA referência a MessagesLog a partir daqui.
+
 const MainApp = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showSettings, setShowSettings] = useState(false);
@@ -20,12 +22,10 @@ const MainApp = () => {
   let user, signOut, isLoading, error;
   let contextError = null;
   try {
-    // console log para debugar o hook
     const auth = useAuth();
     user = auth.user;
     signOut = auth.signOut;
     isLoading = auth.isLoading;
-    // Forçar log sempre que o estado do auth mudar
     console.log("Auth info", { user, isLoading });
   } catch (e) {
     console.error("Erro no useAuth:", e);
@@ -65,12 +65,10 @@ const MainApp = () => {
   }
 
   if (!user) {
-    // Debug do auth para login
     console.log("Nenhum usuário autenticado. Exibindo tela de login.");
     return <LoginForm />;
   }
 
-  // Debug de usuário autenticado
   console.log("Usuário autenticado:", user);
 
   return (
@@ -161,7 +159,6 @@ const MainApp = () => {
 };
 
 const Index = () => {
-  // Console log assim que entrar na página inicial
   console.log("Renderizando Index.tsx");
   return (
     <AuthProvider>
