@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,8 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import CampaignForm from "./CampaignForm";
 import CampaignList from "./CampaignList";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 const GOOGLE_STORAGE_KEY = "googleContactsSheetId";
 
@@ -16,27 +19,19 @@ interface CampaignsManagerProps {
   contactGroups: string[];
 }
 
+interface CampaignDB {
+  id: string;
+  name: string;
+  message: string;
+  status: string;
+  sent: number;
+  total: number;
+  group?: string;
+  created_at?: string;
+}
+
 const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) => {
-  const [campaigns, setCampaigns] = useState([
-    {
-      id: 1,
-      name: "Promoção Black Friday",
-      message: "Não perca nossa super promoção! Descontos de até 50%",
-      status: "active",
-      sent: 150,
-      total: 200,
-      group: "Todos os contatos"
-    },
-    {
-      id: 2,
-      name: "Lembrete Consulta",
-      message: "Lembrete: Sua consulta está agendada para amanhã",
-      status: "paused",
-      sent: 45,
-      total: 100,
-      group: "Clientes"
-    }
-  ]);
+  const [campaigns, setCampaigns] = useState<CampaignDB[]>([]);
   const [newCampaign, setNewCampaign] = useState({ name: "", message: "" });
   const [contactSource, setContactSource] = useState<"supabase" | "google">("supabase");
   const [googleConnected, setGoogleConnected] = useState<boolean>(false);
@@ -47,6 +42,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
   const [recurringInterval, setRecurringInterval] = useState<number>(7);
   const [selectedGroup, setSelectedGroup] = useState("Todos os contatos");
   const { toast } = useToast();
+  const { user } = useAuth();
 
   // Substituir supabaseGroups pelo prop contactGroups:
   const supabaseGroups = contactGroups.length > 0 ? contactGroups : ["Todos os contatos"];
@@ -60,6 +56,39 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     }
   }, []);
 
+  // Buscar campanhas reais do Supabase
+  useEffect(() => {
+    async function fetchCampaigns() {
+      if (!user) return;
+      const { data, error } = await supabase
+        .from("campaigns")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      if (error) {
+        toast({
+          title: "Erro ao buscar campanhas",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+      // Adaptar os dados para exibir corretamente na lista
+      const formatted = (data || []).map(c => ({
+        id: c.id,
+        name: c.name,
+        message: c.message,
+        status: c.status || "draft",
+        sent: 0,
+        total: 0,
+        group: c.group,
+        created_at: c.created_at,
+      }));
+      setCampaigns(formatted);
+    }
+    fetchCampaigns();
+  }, [user, toast]);
+
   const handleConnectGoogle = () => {
     const fakeSheetId = "MinhaPlanilhaContatosGoogle";
     setGoogleConnected(true);
@@ -71,7 +100,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     });
   };
 
-  const createCampaign = () => {
+  const createCampaign = async () => {
     if (!newCampaign.name || !newCampaign.message) {
       toast({
         title: "Erro",
@@ -80,25 +109,47 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       });
       return;
     }
+    if (!user) {
+      toast({
+        title: "Erro de autenticação",
+        description: "É necessário estar logado para criar campanha.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    const campaign = {
-      id: Date.now(),
-      ...newCampaign,
-      status: "draft" as const,
+    // Salva a campanha no Supabase
+    const insertObj: any = {
+      user_id: user.id,
+      name: newCampaign.name,
+      message: newCampaign.message,
+      status: "draft",
       sent: 0,
       total: 0,
-      contactSource,
       group: selectedGroup,
-      schedule: {
-        type: scheduleType,
-        date: scheduleDate,
-        time: scheduleTime,
-        intervalDays: scheduleType === "recurring" ? recurringInterval : undefined,
-      },
-      googleSheetName: contactSource === "google" ? googleSheetName : undefined,
+      schedule_type: scheduleType,
+      schedule_date: scheduleDate,
+      schedule_time: scheduleTime,
+      recurring_interval: scheduleType === "recurring" ? recurringInterval : null,
+      googleSheetName: contactSource === "google" ? googleSheetName : null,
     };
 
-    setCampaigns([...campaigns, campaign]);
+    const { data, error } = await supabase
+      .from("campaigns")
+      .insert([insertObj])
+      .select()
+      .single();
+
+    if (error) {
+      toast({
+        title: "Erro",
+        description: `Erro ao criar campanha: ${error.message}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Refaz busca após inserir nova campanha
     setNewCampaign({ name: "", message: "" });
     setSelectedGroup("Todos os contatos");
 
@@ -106,9 +157,33 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       title: "Campanha criada",
       description: `Campanha ${newCampaign.name} criada com sucesso`,
     });
+
+    // Atualiza lista local
+    setCampaigns(prev => [
+      {
+        id: data.id,
+        name: data.name,
+        message: data.message,
+        status: data.status || "draft",
+        sent: 0,
+        total: 0,
+        group: data.group,
+        created_at: data.created_at,
+      },
+      ...prev,
+    ]);
   };
 
-  const deleteCampaign = (id: number) => {
+  const deleteCampaign = async (id: string) => {
+    const { error } = await supabase.from("campaigns").delete().eq("id", id);
+    if (error) {
+      toast({
+        title: "Erro ao remover campanha",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
     setCampaigns(campaigns.filter(campaign => campaign.id !== id));
     toast({
       title: "Campanha removida",
@@ -193,3 +268,4 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
 };
 
 export default CampaignsManager;
+
