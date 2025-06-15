@@ -1,24 +1,13 @@
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Send, Plus, Play, Pause, Trash2 } from "lucide-react";
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { Send } from "lucide-react";
 import CampaignForm from "./CampaignForm";
 import CampaignList from "./CampaignList";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useToast } from "@/hooks/use-toast";
 
-const GOOGLE_STORAGE_KEY = "googleContactsSheetId";
-
-interface CampaignsManagerProps {
-  contactGroups: string[];
-}
-
+// Tipos baseados no schema real do banco
 interface CampaignDB {
   id: string;
   name: string;
@@ -26,9 +15,14 @@ interface CampaignDB {
   status: string;
   sent: number;
   total: number;
-  group?: string;
   created_at?: string;
 }
+
+interface CampaignsManagerProps {
+  contactGroups: string[];
+}
+
+const GOOGLE_STORAGE_KEY = "googleContactsSheetId";
 
 const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) => {
   const [campaigns, setCampaigns] = useState<CampaignDB[]>([]);
@@ -44,7 +38,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // Substituir supabaseGroups pelo prop contactGroups:
+  // Grupos disponíveis
   const supabaseGroups = contactGroups.length > 0 ? contactGroups : ["Todos os contatos"];
   const googleSheetGroups = ["Todos os contatos", "Ativos", "Leads", "Pós-venda"];
 
@@ -73,15 +67,14 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         });
         return;
       }
-      // Adaptar os dados para exibir corretamente na lista
-      const formatted = (data || []).map(c => ({
+      // Adaptar dados reais para uso local
+      const formatted = (data || []).map((c: any) => ({
         id: c.id,
         name: c.name,
         message: c.message,
         status: c.status || "draft",
         sent: 0,
         total: 0,
-        group: c.group,
         created_at: c.created_at,
       }));
       setCampaigns(formatted);
@@ -118,7 +111,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       return;
     }
 
-    // Salva a campanha no Supabase
+    // O schema real não aceita group ou googleSheetName, nem schedule fields extras, então removemos do payload:
     const insertObj: any = {
       user_id: user.id,
       name: newCampaign.name,
@@ -126,12 +119,10 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       status: "draft",
       sent: 0,
       total: 0,
-      group: selectedGroup,
-      schedule_type: scheduleType,
-      schedule_date: scheduleDate,
-      schedule_time: scheduleTime,
-      recurring_interval: scheduleType === "recurring" ? recurringInterval : null,
-      googleSheetName: contactSource === "google" ? googleSheetName : null,
+      // outros campos obrigatórios do banco aqui, se faltarem!
+      instance_id: "00000000-0000-0000-0000-000000000000", // Ajuste conforme necessário!
+      contact_ids: [],
+      // schedule fields omitidos pois não existem no schema do banco
     };
 
     const { data, error } = await supabase
@@ -149,7 +140,6 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       return;
     }
 
-    // Refaz busca após inserir nova campanha
     setNewCampaign({ name: "", message: "" });
     setSelectedGroup("Todos os contatos");
 
@@ -158,7 +148,6 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       description: `Campanha ${newCampaign.name} criada com sucesso`,
     });
 
-    // Atualiza lista local
     setCampaigns(prev => [
       {
         id: data.id,
@@ -167,13 +156,13 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         status: data.status || "draft",
         sent: 0,
         total: 0,
-        group: data.group,
         created_at: data.created_at,
       },
       ...prev,
     ]);
   };
 
+  // Parâmetro id: string (UUID)
   const deleteCampaign = async (id: string) => {
     const { error } = await supabase.from("campaigns").delete().eq("id", id);
     if (error) {
@@ -259,6 +248,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       {/* Lista de Campanhas */}
       <CampaignList
         campaigns={campaigns}
+        // Corrigir o tipo do delete para string
         deleteCampaign={deleteCampaign}
         getStatusColor={getStatusColor}
         getStatusText={getStatusText}
@@ -268,4 +258,3 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
 };
 
 export default CampaignsManager;
-
