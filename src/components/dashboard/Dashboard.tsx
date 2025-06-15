@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3, MessageSquare, Users, Send, Zap } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
@@ -17,26 +17,35 @@ async function isCampaignCronEnabled() {
 
 // Função para tentar ativar o cron (na verdade, roda o schedule SQL no backend -- aqui vamos simular para o botão)
 async function enableCampaignCron(enable: boolean) {
-  // Aqui normalmente chamaríamos uma API/admin endpoint para criar/remover/criar o cron job via SQL.
-  // Por ora apenas um toast informativo para o usuário/simulando sucesso.
   if (enable) {
-    toast({ title: "Agendamento automático ativado", description: "O job pg_cron está ativado para disparar campanhas.", variant: "default", });
+    toast({
+      title: "Agendamento automático ativado",
+      description: "O job pg_cron está ativado para disparar campanhas.",
+      variant: "default",
+    });
   } else {
-    toast({ title: "Agendamento automático desativado", description: "O job pg_cron foi desativado e não irá mais disparar campanhas automaticamente.", variant: "default", });
+    toast({
+      title: "Agendamento automático desativado",
+      description: "O job pg_cron foi desativado e não irá mais disparar campanhas automaticamente.",
+      variant: "default",
+    });
   }
 }
+
+type StatConfig = {
+  title: string;
+  value: string | number;
+  icon: React.ElementType;
+  color: string;
+  bgColor: string;
+};
 
 const Dashboard = () => {
   const { stats, loading } = useDashboardStats();
   // Cron control state - simplificado
   const [cronEnabled, setCronEnabled] = useState(true);
 
-  // Para o futuro: recuperar de fato o status do cron...
-  /*useEffect(() => {
-    isCampaignCronEnabled().then(setCronEnabled);
-  }, []);*/
-
-  const statsConfig = [
+  const statsConfig: StatConfig[] = [
     {
       title: "Mensagens Enviadas",
       value: loading ? "..." : stats.sentMessages.toLocaleString(),

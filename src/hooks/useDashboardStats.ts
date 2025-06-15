@@ -31,46 +31,61 @@ export function useDashboardStats() {
       }
 
       // Mensagens enviadas (messages_log)
-      const [{ count: sentMessages = 0 } = {}] = await Promise.all([
-        supabase
-          .from("messages_log")
-          .select("*", { count: "exact", head: true })
-          .eq("status", "sent")
-          .eq("user_id", user.id), // só se messages_log tiver user_id. Caso não tenha, remova essa linha.
-      ]).then(
-        ([msgResult]) => [msgResult]
-      );
+      let sentMessages = 0;
+      const sentMessagesResult = await supabase
+        .from("messages_log")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "sent");
+      if (!sentMessagesResult.error && typeof sentMessagesResult.count === "number") {
+        sentMessages = sentMessagesResult.count;
+      }
 
       // Campanhas
-      const { count: totalCampaigns = 0 } = await supabase
+      let totalCampaigns = 0;
+      const totalCampaignsRes = await supabase
         .from("campaigns")
         .select("*", { count: "exact", head: true })
         .eq("user_id", user.id);
+      if (!totalCampaignsRes.error && typeof totalCampaignsRes.count === "number") {
+        totalCampaigns = totalCampaignsRes.count;
+      }
 
-      const { count: activeCampaigns = 0 } = await supabase
+      let activeCampaigns = 0;
+      const activeCampaignsRes = await supabase
         .from("campaigns")
         .select("*", { count: "exact", head: true })
         .eq("user_id", user.id)
         .eq("status", "active");
+      if (!activeCampaignsRes.error && typeof activeCampaignsRes.count === "number") {
+        activeCampaigns = activeCampaignsRes.count;
+      }
 
       // Contatos
-      const { count: totalContacts = 0 } = await supabase
+      let totalContacts = 0;
+      const totalContactsRes = await supabase
         .from("contacts")
         .select("*", { count: "exact", head: true })
         .eq("user_id", user.id);
+      if (!totalContactsRes.error && typeof totalContactsRes.count === "number") {
+        totalContacts = totalContactsRes.count;
+      }
 
       // Instâncias
-      const { count: totalInstances = 0 } = await supabase
+      let totalInstances = 0;
+      const totalInstancesRes = await supabase
         .from("instances")
         .select("*", { count: "exact", head: true })
         .eq("user_id", user.id);
+      if (!totalInstancesRes.error && typeof totalInstancesRes.count === "number") {
+        totalInstances = totalInstancesRes.count;
+      }
 
       setStats({
-        sentMessages: sentMessages ?? 0,
-        activeCampaigns: activeCampaigns ?? 0,
-        totalCampaigns: totalCampaigns ?? 0,
-        totalContacts: totalContacts ?? 0,
-        totalInstances: totalInstances ?? 0,
+        sentMessages,
+        activeCampaigns,
+        totalCampaigns,
+        totalContacts,
+        totalInstances,
       });
       setLoading(false);
     }
