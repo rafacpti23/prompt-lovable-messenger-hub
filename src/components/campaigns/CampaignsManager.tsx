@@ -244,12 +244,12 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     }
   };
 
-  // NOVA FUNÇÃO: Iniciar campanha (atualiza status para "active")
+  // NOVA FUNÇÃO: Iniciar campanha (atualiza status para "scheduled")
   const startCampaign = async (id: string) => {
     const { supabase } = await import("@/integrations/supabase/client");
     const { error } = await supabase
       .from("campaigns")
-      .update({ status: "active" })
+      .update({ status: "scheduled" })
       .eq("id", id);
     if (error) {
       toast({
@@ -260,11 +260,11 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       return;
     }
     setCampaigns((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, status: "active" } : c))
+      prev.map((c) => (c.id === id ? { ...c, status: "scheduled" } : c))
     );
     toast({
       title: "Campanha iniciada",
-      description: "A campanha foi marcada como ativa. O disparo será feito conforme agendamento.",
+      description: "A campanha foi marcada como agendada. O disparo será feito conforme agendamento.",
     });
   };
 
