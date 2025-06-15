@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -6,18 +5,18 @@ import { Play, Pause, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Campaign {
-  id: number;
+  id: string; // Correction: string for UUID
   name: string;
   message: string;
   status: string;
   sent: number;
   total: number;
-  group?: string;
+  created_at?: string;
 }
 
 interface CampaignListProps {
   campaigns: Campaign[];
-  deleteCampaign: (id: number) => void;
+  deleteCampaign: (id: string) => void;  // Correction: id is string
   getStatusColor: (status: string) => string;
   getStatusText: (status: string) => string;
 }
@@ -37,9 +36,7 @@ const CampaignList: React.FC<CampaignListProps> = ({
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
                   <h3 className="font-semibold">{campaign.name}</h3>
-                  {campaign.group && (
-                    <Badge variant="secondary" className="ml-1">{campaign.group}</Badge>
-                  )}
+                  {/* group/badge removed, don't display group */}
                   <Badge className={getStatusColor(campaign.status)}>
                     {getStatusText(campaign.status)}
                   </Badge>
