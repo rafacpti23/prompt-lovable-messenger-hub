@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Users, Plus, Search, Trash2, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import GroupSelector from "./GroupSelector";
 
 const ContactsManager = () => {
   const [contacts, setContacts] = useState([
@@ -24,7 +24,17 @@ const ContactsManager = () => {
   ]);
   const [searchTerm, setSearchTerm] = useState("");
   const [newContact, setNewContact] = useState({ name: "", phone: "", group: "" });
+  const [groups, setGroups] = useState<string[]>(() => {
+    // Inicializa grupos únicos dos contatos existentes
+    const all = Array.from(new Set([...(contacts.map(c => c.group).filter(Boolean))]));
+    return all;
+  });
   const { toast } = useToast();
+
+  // Mantém groups sincronizado se contatos mudam
+  React.useEffect(() => {
+    setGroups(Array.from(new Set([...(contacts.map(c => c.group).filter(Boolean))])));
+  }, [contacts]);
 
   const filteredContacts = contacts.filter(contact =>
     contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -32,11 +42,25 @@ const ContactsManager = () => {
     contact.group.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const handleCreateGroup = (group: string) => {
+    if (groups.includes(group)) return;
+    setGroups([...groups, group]);
+    toast({ title: "Grupo criado", description: `Grupo '${group}' foi adicionado.` });
+  };
+
   const addContact = () => {
     if (!newContact.name || !newContact.phone) {
       toast({
         title: "Erro",
         description: "Nome e telefone são obrigatórios",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!newContact.group) {
+      toast({
+        title: "Erro",
+        description: "Selecione ou crie um grupo",
         variant: "destructive",
       });
       return;
@@ -93,10 +117,11 @@ const ContactsManager = () => {
               value={newContact.phone}
               onChange={(e) => setNewContact({...newContact, phone: e.target.value})}
             />
-            <Input
-              placeholder="Grupo (opcional)"
+            <GroupSelector
+              groups={groups}
               value={newContact.group}
-              onChange={(e) => setNewContact({...newContact, group: e.target.value})}
+              onChange={(group) => setNewContact({...newContact, group})}
+              onCreateGroup={handleCreateGroup}
             />
             <Button onClick={addContact}>
               <Plus className="h-4 w-4 mr-2" />
