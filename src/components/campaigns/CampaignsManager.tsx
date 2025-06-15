@@ -19,6 +19,12 @@ interface CampaignDB {
   total: number; // Agora obrigatório
 }
 
+interface Instance {
+  id: string;
+  instance_name: string;
+  status: string | null;
+}
+
 interface CampaignsManagerProps {
   contactGroups: string[];
 }
@@ -36,6 +42,9 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
   const [scheduleTime, setScheduleTime] = useState("");
   const [recurringInterval, setRecurringInterval] = useState<number>(7);
   const [selectedGroup, setSelectedGroup] = useState("Todos os contatos");
+  const [instances, setInstances] = useState<Instance[]>([]);
+  const [selectedInstanceId, setSelectedInstanceId] = useState<string>("");
+
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -50,6 +59,30 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       setGoogleSheetName(sheetId);
     }
   }, []);
+
+  // Buscar instâncias do usuário logado
+  useEffect(() => {
+    async function fetchInstances() {
+      if (!user) return;
+      const { data, error } = await supabase
+        .from("instances")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      if (!error && data) {
+        setInstances(
+          data.map((inst: any) => ({
+            id: inst.id,
+            instance_name: inst.instance_name,
+            status: inst.status,
+          }))
+        );
+        // Seleciona automaticamente a primeira instância se houver alguma
+        if (data.length > 0) setSelectedInstanceId(data[0].id);
+      }
+    }
+    fetchInstances();
+  }, [user]);
 
   // Buscar campanhas reais do Supabase
   useEffect(() => {
@@ -111,14 +144,21 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       });
       return;
     }
+    if (!selectedInstanceId) {
+      toast({
+        title: "Selecione uma instância",
+        description: "É preciso escolher uma instância conectada.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    // O schema real não aceita group ou googleSheetName, nem schedule fields extras, então removemos do payload:
     const insertObj: any = {
       user_id: user.id,
       name: newCampaign.name,
       message: newCampaign.message,
       status: "draft",
-      instance_id: "00000000-0000-0000-0000-000000000000", // Ajuste conforme necessário!
+      instance_id: selectedInstanceId,
       contact_ids: [],
     };
 
@@ -152,7 +192,6 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         message: data.message,
         status: data.status || "draft",
         created_at: data.created_at,
-        // Adiciona sempre sent: 0 e total: 0 para uso no CampaignList
         sent: 0,
         total: 0,
       },
@@ -241,6 +280,9 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         recurringInterval={recurringInterval}
         setRecurringInterval={setRecurringInterval}
         createCampaign={createCampaign}
+        instances={instances}
+        selectedInstanceId={selectedInstanceId}
+        setSelectedInstanceId={setSelectedInstanceId}
       />
 
       {/* Lista de Campanhas */}

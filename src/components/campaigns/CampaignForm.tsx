@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,6 +6,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Plus } from "lucide-react";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+
+interface Instance {
+  id: string;
+  instance_name: string;
+  status: string | null;
+}
 
 interface CampaignFormProps {
   newCampaign: { name: string; message: string };
@@ -31,6 +36,9 @@ interface CampaignFormProps {
   recurringInterval: number;
   setRecurringInterval: (v: number) => void;
   createCampaign: () => void;
+  instances: Instance[];
+  selectedInstanceId: string;
+  setSelectedInstanceId: (id: string) => void;
 }
 
 const GOOGLE_STORAGE_KEY = "googleContactsSheetId";
@@ -58,6 +66,9 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
   recurringInterval,
   setRecurringInterval,
   createCampaign,
+  instances,
+  selectedInstanceId,
+  setSelectedInstanceId,
 }) => {
   return (
     <Card>
@@ -69,6 +80,24 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
+          {/* Instância WhatsApp */}
+          <div>
+            <label className="block font-medium mb-2">Instância WhatsApp:</label>
+            <select
+              className="w-80 px-2 py-1 border rounded"
+              value={selectedInstanceId}
+              onChange={e => setSelectedInstanceId(e.target.value)}
+            >
+              {instances.length === 0 && (
+                <option value="">Nenhuma instância conectada</option>
+              )}
+              {instances.map((inst) => (
+                <option value={inst.id} key={inst.id}>
+                  {inst.instance_name} {inst.status === "connected" ? "(Conectada)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* Fonte de contatos */}
           <div>
