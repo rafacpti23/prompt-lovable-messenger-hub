@@ -8,6 +8,7 @@ import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { useMessagesByDay } from "@/hooks/useMessagesByDay";
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart, XAxis, YAxis, Tooltip, Bar, ResponsiveContainer, CartesianGrid } from "recharts";
+import TutorialModal from "@/components/TutorialModal";
 
 // Função utilitária para verificar se o cron job está ativo
 async function isCampaignCronEnabled() {
