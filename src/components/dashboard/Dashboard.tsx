@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3, MessageSquare, Users, Send, Zap, Play } from "lucide-react";
@@ -152,7 +153,7 @@ const Dashboard = () => {
             id="auto-campaign-dispatch"
           />
           <label htmlFor="auto-campaign-dispatch" className="ml-2 text-sm text-gray-700">
-            Disparar campanhas automaticamente via pg_cron
+            Disparar campanhas automaticamente
           </label>
         </div>
       </div>

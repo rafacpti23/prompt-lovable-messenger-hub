@@ -162,7 +162,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       // Busca todos os contatos do usuário para popular contact_ids
       const { data: contacts, error: contactsError } = await supabase
         .from("contacts")
-        .select("id")
+        .select("id, phone")
         .eq("user_id", user.id);
 
       if (contactsError) {
@@ -185,16 +185,29 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         return;
       }
 
-      // Calcula o horário agendado se fornecido (formato timezone de São Paulo)
+      // Calcula o horário agendado se fornecido
       let scheduledForSaoPaulo = null;
       let brasilDateTime = null;
+      
       if (scheduleDate && scheduleTime) {
-        // Cria o datetime no formato literal com timezone de São Paulo (UTC-3)
+        // Cria o datetime no formato de São Paulo (UTC-3)
         scheduledForSaoPaulo = `${scheduleDate} ${scheduleTime}:00-03`;
         brasilDateTime = new Date(`${scheduleDate}T${scheduleTime}:00`);
         
         console.log("Horário digitado (Brasília):", `${scheduleDate} ${scheduleTime}:00`);
         console.log("Horário salvo no banco (São Paulo UTC-3):", scheduledForSaoPaulo);
+      } else {
+        // Se não tem horário definido, agenda para agora
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        
+        scheduledForSaoPaulo = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}-03`;
+        brasilDateTime = now;
       }
 
       const insertObj = {
@@ -222,13 +235,14 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         return;
       }
 
-      // Criar scheduled_messages para cada contato
-      const scheduledMessages = contactIds.map(contactId => ({
+      // Criar scheduled_messages para cada contato com o telefone correto
+      const scheduledMessages = contacts.map(contact => ({
         campaign_id: data.id,
-        contact_id: contactId,
-        phone: "", // Será preenchido pela Edge Function
+        contact_id: contact.id,
+        phone: contact.phone,
         message: newCampaign.message,
-        scheduled_for: scheduledForSaoPaulo || new Date().toISOString(),
+        scheduled_for: scheduledForSaoPaulo,
+        status: 'pending'
       }));
 
       const { error: scheduleError } = await supabase
@@ -236,8 +250,16 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         .insert(scheduledMessages);
 
       if (scheduleError) {
-        console.warn("Erro ao criar mensagens agendadas:", scheduleError);
+        console.error("Erro ao criar mensagens agendadas:", scheduleError);
+        toast({
+          title: "Erro",
+          description: `Erro ao agendar mensagens: ${scheduleError.message}`,
+          variant: "destructive",
+        });
+        return;
       }
+
+      console.log("Mensagens agendadas criadas:", scheduledMessages.length);
 
       setNewCampaign({ name: "", message: "" });
       setScheduleDate("");
@@ -343,8 +365,14 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     } else {
       // Se não tem horário agendado, agenda para agora no timezone de São Paulo
       const now = new Date();
-      const brasilTime = new Date(now.getTime() - (3 * 60 * 60 * 1000));
-      scheduledForSaoPaulo = brasilTime.toISOString().slice(0, 19) + '-03';
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+      
+      scheduledForSaoPaulo = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}-03`;
     }
     
     const { error } = await supabase
