@@ -185,6 +185,20 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         return;
       }
 
+      // Calcula o horário agendado se fornecido
+      let scheduledForUTC = null;
+      if (scheduleDate && scheduleTime) {
+        // Cria o datetime com base na data e hora fornecidas (horário de Brasília)
+        const brasilDateTime = new Date(`${scheduleDate}T${scheduleTime}:00`);
+        
+        // Adiciona 3 horas para converter de Brasília para UTC
+        const utcDateTime = new Date(brasilDateTime.getTime() + (3 * 60 * 60 * 1000));
+        scheduledForUTC = utcDateTime.toISOString();
+        
+        console.log("Horário digitado (Brasília):", brasilDateTime.toISOString());
+        console.log("Horário convertido (UTC):", scheduledForUTC);
+      }
+
       const insertObj = {
         user_id: user.id,
         name: newCampaign.name,
@@ -192,6 +206,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         status: "draft",
         instance_id: selectedInstanceId,
         contact_ids: contactIds,
+        scheduled_for: scheduledForUTC,
       };
 
       const { data, error } = await supabase
@@ -215,7 +230,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         contact_id: contactId,
         phone: "", // Será preenchido pela Edge Function
         message: newCampaign.message,
-        scheduled_for: new Date().toISOString(),
+        scheduled_for: scheduledForUTC || new Date().toISOString(),
       }));
 
       const { error: scheduleError } = await supabase
@@ -227,11 +242,17 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       }
 
       setNewCampaign({ name: "", message: "" });
+      setScheduleDate("");
+      setScheduleTime("");
       setSelectedGroup("Todos os contatos");
       
+      const messageText = scheduledForUTC 
+        ? `Campanha ${newCampaign.name} criada e agendada para ${brasilDateTime.toLocaleString('pt-BR')} (horário de Brasília)`
+        : `Campanha ${newCampaign.name} criada com ${contactIds.length} contatos`;
+        
       toast({
         title: "Campanha criada",
-        description: `Campanha ${newCampaign.name} criada com ${contactIds.length} contatos`,
+        description: messageText,
       });
 
       setCampaigns(prev => [
@@ -307,16 +328,24 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     }
   };
 
-  // NOVA FUNÇÃO: Iniciar campanha (atualiza status para "scheduled" e define scheduled_for)
+  // Função para iniciar campanha
   const startCampaign = async (id: string) => {
-    // Calcula o horário atual em UTC (que é como o Supabase armazena)
-    const now = new Date();
-    const scheduledForUTC = now.toISOString();
+    // Busca a campanha para verificar se tem horário agendado
+    const { data: campaign } = await supabase
+      .from("campaigns")
+      .select("scheduled_for")
+      .eq("id", id)
+      .single();
     
-    // Para debug: mostra os horários
-    const brazilTime = new Date(now.getTime() - 3 * 60 * 60 * 1000);
-    console.log("Horário atual UTC (banco):", scheduledForUTC);
-    console.log("Horário atual Brasil:", brazilTime.toISOString());
+    let scheduledForUTC;
+    
+    if (campaign?.scheduled_for) {
+      // Se já tem horário agendado, usa ele
+      scheduledForUTC = campaign.scheduled_for;
+    } else {
+      // Se não tem horário agendado, agenda para agora
+      scheduledForUTC = new Date().toISOString();
+    }
     
     const { error } = await supabase
       .from("campaigns")
@@ -339,9 +368,13 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       prev.map((c) => (c.id === id ? { ...c, status: "scheduled" } : c))
     );
     
+    // Converte o horário UTC para horário de Brasília para mostrar ao usuário
+    const utcDate = new Date(scheduledForUTC);
+    const brasilDate = new Date(utcDate.getTime() - (3 * 60 * 60 * 1000));
+    
     toast({
       title: "Campanha agendada",
-      description: `A campanha foi agendada e será enviada automaticamente. Horário: ${brazilTime.toLocaleString('pt-BR')}`,
+      description: `A campanha foi agendada para ${brasilDate.toLocaleString('pt-BR')} (horário de Brasília)`,
     });
   };
 
