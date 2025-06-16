@@ -136,6 +136,10 @@ const Dashboard = () => {
             <Play className="h-4 w-4" />
             <span>Testar Disparo</span>
           </Button>
+          
+          {/* Tutorial Button */}
+          <TutorialModal />
+          
           <Zap className="h-5 w-5 text-yellow-500" />
           <Switch
             checked={cronEnabled}

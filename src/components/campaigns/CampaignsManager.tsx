@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Send } from "lucide-react";
 import CampaignForm from "./CampaignForm";
@@ -310,13 +309,23 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
 
   // NOVA FUNÇÃO: Iniciar campanha (atualiza status para "scheduled" e define scheduled_for)
   const startCampaign = async (id: string) => {
+    // Calcula o horário atual em UTC (que é como o Supabase armazena)
+    const now = new Date();
+    const scheduledForUTC = now.toISOString();
+    
+    // Para debug: mostra os horários
+    const brazilTime = new Date(now.getTime() - 3 * 60 * 60 * 1000);
+    console.log("Horário atual UTC (banco):", scheduledForUTC);
+    console.log("Horário atual Brasil:", brazilTime.toISOString());
+    
     const { error } = await supabase
       .from("campaigns")
       .update({ 
         status: "scheduled", 
-        scheduled_for: new Date().toISOString() 
+        scheduled_for: scheduledForUTC
       })
       .eq("id", id);
+      
     if (error) {
       toast({
         title: "Erro ao iniciar campanha",
@@ -325,12 +334,14 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       });
       return;
     }
+    
     setCampaigns((prev) =>
       prev.map((c) => (c.id === id ? { ...c, status: "scheduled" } : c))
     );
+    
     toast({
       title: "Campanha agendada",
-      description: "A campanha foi agendada e será enviada automaticamente. Use o botão 'Testar Disparo' no Dashboard para enviar as mensagens.",
+      description: `A campanha foi agendada e será enviada automaticamente. Horário: ${brazilTime.toLocaleString('pt-BR')}`,
     });
   };
 

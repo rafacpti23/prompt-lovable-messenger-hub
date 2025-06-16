@@ -24,16 +24,42 @@ Deno.serve(async (req) => {
 
   console.log("Evolution API Config:", { evolutionApiUrl, evolutionApiKey });
 
-  // Busca uma campanha ativa OU agendada (buscaremos sempre uma por execução)
+  // Horário atual em UTC para comparação
+  const nowUTC = new Date().toISOString();
+  console.log("Horário atual UTC:", nowUTC);
+  
+  // Converte para horário brasileiro (UTC-3) para logging
+  const nowBrazil = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+  console.log("Horário atual Brasil (UTC-3):", nowBrazil);
+
+  // Busca campanhas ativas OU agendadas que já passaram do horário
   const { data: campaigns, error: campaignsError } = await supabase
     .from("campaigns")
     .select("*")
     .in("status", ["active", "scheduled"])
+    .or(`status.eq.active,and(status.eq.scheduled,scheduled_for.lte.${nowUTC})`)
     .limit(1);
+
+  console.log("Campanhas encontradas:", campaigns?.length || 0);
+  if (campaigns && campaigns.length > 0) {
+    console.log("Primeira campanha:", {
+      id: campaigns[0].id,
+      status: campaigns[0].status,
+      scheduled_for: campaigns[0].scheduled_for,
+      name: campaigns[0].name
+    });
+  }
 
   if (campaignsError || !campaigns || campaigns.length === 0) {
     return new Response(
-      JSON.stringify({ message: "Nenhuma campanha ativa ou agendada para disparo." }),
+      JSON.stringify({ 
+        message: "Nenhuma campanha ativa ou agendada para disparo no momento.",
+        debug: {
+          nowUTC,
+          nowBrazil,
+          campaignsError
+        }
+      }),
       { status: 200, headers: corsHeaders }
     );
   }
@@ -42,6 +68,7 @@ Deno.serve(async (req) => {
   
   // Se a campanha está como "scheduled", muda para "active" automaticamente
   if (campaign.status === "scheduled") {
+    console.log("Ativando campanha agendada:", campaign.id);
     await supabase
       .from("campaigns")
       .update({ status: "active" })
@@ -53,17 +80,23 @@ Deno.serve(async (req) => {
       ? campaign.pause_between_messages
       : 5;
 
-  // Busca todos os contatos pendentes dessa campanha
+  // Busca mensagens pendentes dessa campanha
   const { data: scheduleRows, error: scheduleError } = await supabase
     .from("scheduled_messages")
-    .select("*")
+    .select(`
+      *,
+      contacts!inner(phone, name)
+    `)
     .eq("campaign_id", campaign.id)
     .eq("status", "pending")
     .order("scheduled_for", { ascending: true })
-    .limit(1); // Só envia uma mensagem por execução
+    .limit(1);
+
+  console.log("Mensagens pendentes encontradas:", scheduleRows?.length || 0);
 
   if (scheduleError || !scheduleRows || scheduleRows.length === 0) {
-    // Pode marcar a campanha como completed se não houver mais mensagens pendentes
+    console.log("Nenhuma mensagem pendente, marcando campanha como concluída");
+    // Marca a campanha como completed se não houver mais mensagens pendentes
     await supabase
       .from("campaigns")
       .update({ status: "completed" })
@@ -71,28 +104,34 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         message: "Não há mensagens pendentes, campanha concluída.",
+        debug: {
+          campaign_id: campaign.id,
+          scheduleError
+        }
       }),
       { status: 200, headers: corsHeaders }
     );
   }
 
   const messageRow = scheduleRows[0];
+  const contact = messageRow.contacts;
 
-  // Remove "+" se houver no número do contato
-  const destinationPhone = messageRow.phone.replace(/^\+/, "");
+  // Pega o telefone do contato relacionado
+  const destinationPhone = contact.phone.replace(/^\+/, "");
 
   // URL correta da Evolution API com instance_id
   const evolutionUrl = `${evolutionApiUrl}/message/sendText/${campaign.instance_id}`;
   
   const sendBody = {
     number: destinationPhone,
-    text: messageRow.message, // Evolution API usa 'text', não 'message'
+    text: messageRow.message,
   };
 
-  console.log("Enviando para Evolution API:", {
+  console.log("Enviando mensagem:", {
     url: evolutionUrl,
-    headers: { apikey: evolutionApiKey },
-    body: sendBody
+    contact_name: contact.name,
+    phone: destinationPhone,
+    message_preview: messageRow.message.substring(0, 50) + "..."
   });
 
   // Envio pela Evolution API
@@ -100,15 +139,19 @@ Deno.serve(async (req) => {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      apikey: evolutionApiKey, // Evolution API usa 'apikey', não 'API Key'
+      apikey: evolutionApiKey,
     },
     body: JSON.stringify(sendBody),
   });
 
   const respData = await evolutionResp.json();
-  console.log("Resposta da Evolution API:", { status: evolutionResp.status, data: respData });
+  console.log("Resposta da Evolution API:", { 
+    status: evolutionResp.status, 
+    success: evolutionResp.ok,
+    data: respData 
+  });
 
-  // Atualiza status da mensagem como enviada ou erro, e responde
+  // Atualiza status da mensagem como enviada ou erro
   const nowISO = new Date().toISOString();
 
   if (evolutionResp.ok) {
@@ -133,6 +176,8 @@ Deno.serve(async (req) => {
           response: respData,
         },
       ]);
+
+    console.log(`Mensagem enviada com sucesso para ${contact.name} (${destinationPhone})`);
   } else {
     await supabase
       .from("scheduled_messages")
@@ -154,10 +199,18 @@ Deno.serve(async (req) => {
           response: respData,
         },
       ]);
+    
+    console.log(`Falha ao enviar mensagem para ${contact.name} (${destinationPhone}):`, respData);
+    
     return new Response(
       JSON.stringify({
         error: "Falha ao enviar mensagem via Evolution API",
         respData,
+        debug: {
+          contact_name: contact.name,
+          phone: destinationPhone,
+          url: evolutionUrl
+        }
       }),
       { status: 500, headers: corsHeaders }
     );
@@ -167,7 +220,15 @@ Deno.serve(async (req) => {
   await new Promise((res) => setTimeout(res, pauseSeconds * 1000));
 
   return new Response(
-    JSON.stringify({ success: true, message: "Mensagem enviada" }),
+    JSON.stringify({ 
+      success: true, 
+      message: "Mensagem enviada", 
+      details: {
+        contact_name: contact.name,
+        phone: destinationPhone,
+        campaign: campaign.name
+      }
+    }),
     { status: 200, headers: corsHeaders }
   );
 });
