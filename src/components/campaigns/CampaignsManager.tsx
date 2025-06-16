@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Send } from "lucide-react";
 import CampaignForm from "./CampaignForm";
@@ -186,19 +185,16 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         return;
       }
 
-      // Calcula o horário agendado se fornecido
-      let scheduledForUTC = null;
+      // Calcula o horário agendado se fornecido (formato timezone de São Paulo)
+      let scheduledForSaoPaulo = null;
       let brasilDateTime = null;
       if (scheduleDate && scheduleTime) {
-        // Cria o datetime com base na data e hora fornecidas (horário de Brasília)
+        // Cria o datetime no formato literal com timezone de São Paulo (UTC-3)
+        scheduledForSaoPaulo = `${scheduleDate} ${scheduleTime}:00-03`;
         brasilDateTime = new Date(`${scheduleDate}T${scheduleTime}:00`);
         
-        // Adiciona 3 horas para converter de Brasília para UTC
-        const utcDateTime = new Date(brasilDateTime.getTime() + (3 * 60 * 60 * 1000));
-        scheduledForUTC = utcDateTime.toISOString();
-        
-        console.log("Horário digitado (Brasília):", brasilDateTime.toISOString());
-        console.log("Horário convertido (UTC):", scheduledForUTC);
+        console.log("Horário digitado (Brasília):", `${scheduleDate} ${scheduleTime}:00`);
+        console.log("Horário salvo no banco (São Paulo UTC-3):", scheduledForSaoPaulo);
       }
 
       const insertObj = {
@@ -208,7 +204,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         status: "draft",
         instance_id: selectedInstanceId,
         contact_ids: contactIds,
-        scheduled_for: scheduledForUTC,
+        scheduled_for: scheduledForSaoPaulo,
       };
 
       const { data, error } = await supabase
@@ -232,7 +228,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         contact_id: contactId,
         phone: "", // Será preenchido pela Edge Function
         message: newCampaign.message,
-        scheduled_for: scheduledForUTC || new Date().toISOString(),
+        scheduled_for: scheduledForSaoPaulo || new Date().toISOString(),
       }));
 
       const { error: scheduleError } = await supabase
@@ -248,7 +244,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       setScheduleTime("");
       setSelectedGroup("Todos os contatos");
       
-      const messageText = scheduledForUTC && brasilDateTime
+      const messageText = scheduledForSaoPaulo && brasilDateTime
         ? `Campanha ${newCampaign.name} criada e agendada para ${brasilDateTime.toLocaleString('pt-BR')} (horário de Brasília)`
         : `Campanha ${newCampaign.name} criada com ${contactIds.length} contatos`;
         
@@ -339,21 +335,23 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       .eq("id", id)
       .single();
     
-    let scheduledForUTC;
+    let scheduledForSaoPaulo;
     
     if (campaign?.scheduled_for) {
       // Se já tem horário agendado, usa ele
-      scheduledForUTC = campaign.scheduled_for;
+      scheduledForSaoPaulo = campaign.scheduled_for;
     } else {
-      // Se não tem horário agendado, agenda para agora
-      scheduledForUTC = new Date().toISOString();
+      // Se não tem horário agendado, agenda para agora no timezone de São Paulo
+      const now = new Date();
+      const brasilTime = new Date(now.getTime() - (3 * 60 * 60 * 1000));
+      scheduledForSaoPaulo = brasilTime.toISOString().slice(0, 19) + '-03';
     }
     
     const { error } = await supabase
       .from("campaigns")
       .update({ 
         status: "scheduled", 
-        scheduled_for: scheduledForUTC
+        scheduled_for: scheduledForSaoPaulo
       })
       .eq("id", id);
       
@@ -370,13 +368,12 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       prev.map((c) => (c.id === id ? { ...c, status: "scheduled" } : c))
     );
     
-    // Converte o horário UTC para horário de Brasília para mostrar ao usuário
-    const utcDate = new Date(scheduledForUTC);
-    const brasilDate = new Date(utcDate.getTime() - (3 * 60 * 60 * 1000));
+    // Parse da data para mostrar ao usuário
+    const scheduledDate = new Date(scheduledForSaoPaulo.replace('-03', ''));
     
     toast({
       title: "Campanha agendada",
-      description: `A campanha foi agendada para ${brasilDate.toLocaleString('pt-BR')} (horário de Brasília)`,
+      description: `A campanha foi agendada para ${scheduledDate.toLocaleString('pt-BR')} (horário de Brasília)`,
     });
   };
 

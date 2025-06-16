@@ -33,9 +33,13 @@ Deno.serve(async (req) => {
   console.log("Horário atual Brasil (UTC-3):", nowBrazil);
 
   // Busca campanhas ativas OU agendadas que já passaram do horário
+  // Agora inclui o join com a tabela instances para pegar o instance_name
   const { data: campaigns, error: campaignsError } = await supabase
     .from("campaigns")
-    .select("*")
+    .select(`
+      *,
+      instances!inner(instance_name)
+    `)
     .in("status", ["active", "scheduled"])
     .or(`status.eq.active,and(status.eq.scheduled,scheduled_for.lte.${nowUTC})`)
     .limit(1);
@@ -46,7 +50,8 @@ Deno.serve(async (req) => {
       id: campaigns[0].id,
       status: campaigns[0].status,
       scheduled_for: campaigns[0].scheduled_for,
-      name: campaigns[0].name
+      name: campaigns[0].name,
+      instance_name: campaigns[0].instances?.instance_name
     });
   }
 
@@ -119,8 +124,24 @@ Deno.serve(async (req) => {
   // Pega o telefone do contato relacionado
   const destinationPhone = contact.phone.replace(/^\+/, "");
 
-  // URL correta da Evolution API com instance_id
-  const evolutionUrl = `${evolutionApiUrl}/message/sendText/${campaign.instance_id}`;
+  // Agora usa o instance_name ao invés do instance_id (UUID)
+  const instanceName = campaign.instances?.instance_name;
+  if (!instanceName) {
+    console.log("Erro: instance_name não encontrado para a campanha:", campaign.id);
+    return new Response(
+      JSON.stringify({
+        error: "Instance name não encontrado para esta campanha",
+        debug: {
+          campaign_id: campaign.id,
+          instance_id: campaign.instance_id
+        }
+      }),
+      { status: 400, headers: corsHeaders }
+    );
+  }
+
+  // URL correta da Evolution API com instance_name
+  const evolutionUrl = `${evolutionApiUrl}/message/sendText/${instanceName}`;
   
   const sendBody = {
     number: destinationPhone,
@@ -129,6 +150,7 @@ Deno.serve(async (req) => {
 
   console.log("Enviando mensagem:", {
     url: evolutionUrl,
+    instance_name: instanceName,
     contact_name: contact.name,
     phone: destinationPhone,
     message_preview: messageRow.message.substring(0, 50) + "..."
@@ -209,7 +231,8 @@ Deno.serve(async (req) => {
         debug: {
           contact_name: contact.name,
           phone: destinationPhone,
-          url: evolutionUrl
+          url: evolutionUrl,
+          instance_name: instanceName
         }
       }),
       { status: 500, headers: corsHeaders }
@@ -226,7 +249,8 @@ Deno.serve(async (req) => {
       details: {
         contact_name: contact.name,
         phone: destinationPhone,
-        campaign: campaign.name
+        campaign: campaign.name,
+        instance_name: instanceName
       }
     }),
     { status: 200, headers: corsHeaders }
