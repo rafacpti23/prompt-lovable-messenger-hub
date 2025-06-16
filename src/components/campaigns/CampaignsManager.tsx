@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Send } from "lucide-react";
 import CampaignForm from "./CampaignForm";
@@ -187,9 +188,10 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
 
       // Calcula o horário agendado se fornecido
       let scheduledForUTC = null;
+      let brasilDateTime = null;
       if (scheduleDate && scheduleTime) {
         // Cria o datetime com base na data e hora fornecidas (horário de Brasília)
-        const brasilDateTime = new Date(`${scheduleDate}T${scheduleTime}:00`);
+        brasilDateTime = new Date(`${scheduleDate}T${scheduleTime}:00`);
         
         // Adiciona 3 horas para converter de Brasília para UTC
         const utcDateTime = new Date(brasilDateTime.getTime() + (3 * 60 * 60 * 1000));
@@ -246,7 +248,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       setScheduleTime("");
       setSelectedGroup("Todos os contatos");
       
-      const messageText = scheduledForUTC 
+      const messageText = scheduledForUTC && brasilDateTime
         ? `Campanha ${newCampaign.name} criada e agendada para ${brasilDateTime.toLocaleString('pt-BR')} (horário de Brasília)`
         : `Campanha ${newCampaign.name} criada com ${contactIds.length} contatos`;
         
