@@ -124,7 +124,7 @@ Deno.serve(async (req) => {
   // Pega o telefone do contato relacionado
   const destinationPhone = contact.phone.replace(/^\+/, "");
 
-  // Agora usa o instance_name ao invés do instance_id (UUID)
+  // Agora usa o instance_name do join da campanha
   const instanceName = campaign.instances?.instance_name;
   if (!instanceName) {
     console.log("Erro: instance_name não encontrado para a campanha:", campaign.id);
@@ -133,7 +133,8 @@ Deno.serve(async (req) => {
         error: "Instance name não encontrado para esta campanha",
         debug: {
           campaign_id: campaign.id,
-          instance_id: campaign.instance_id
+          instance_id: campaign.instance_id,
+          instances_data: campaign.instances
         }
       }),
       { status: 400, headers: corsHeaders }
