@@ -11,80 +11,48 @@ export function useBilling() {
     if (!user) return { error: "Usuário não autenticado" };
 
     try {
-      // Criar transação
-      const { data: transactionData, error: transactionError } = await supabase
-        .from("transactions")
-        .insert({
-          user_id: user.id,
-          plan_id: planId,
-          amount: 0, // Será atualizado com o valor real do plano
-          status: "pending"
-        })
-        .select()
-        .single();
+      const { data, error } = await supabase.functions.invoke("create-stripe-checkout", {
+        body: { planId }
+      });
 
-      if (transactionError) {
-        throw transactionError;
+      if (error) throw error;
+
+      // Se for trial, não precisa redirecionar
+      if (data.trial) {
+        await refreshSubscription();
+        return { success: true };
       }
 
-      // Buscar dados do plano
-      const { data: planData, error: planError } = await supabase
-        .from("plans")
-        .select("*")
-        .eq("id", planId)
-        .single();
-
-      if (planError) {
-        throw planError;
+      // Redirecionar para checkout do Stripe
+      if (data.url) {
+        window.open(data.url, '_blank');
+        return { success: true };
       }
 
-      // Atualizar valor da transação
-      await supabase
-        .from("transactions")
-        .update({ amount: planData.price })
-        .eq("id", transactionData.id);
-
-      // Por enquanto, vamos simular pagamento aprovado automaticamente
-      // Em produção, aqui seria integrado com gateway de pagamento
-      await supabase
-        .from("transactions")
-        .update({ status: "completed" })
-        .eq("id", transactionData.id);
-
-      // Cancelar assinatura atual se existir
-      if (subscription) {
-        await supabase
-          .from("user_subscriptions")
-          .update({ status: "cancelled" })
-          .eq("id", subscription.id);
-      }
-
-      // Criar nova assinatura
-      const expiresAt = planData.name === "trial" 
-        ? new Date(Date.now() + planData.duration_days * 24 * 60 * 60 * 1000)
-        : new Date(Date.now() + planData.duration_days * 24 * 60 * 60 * 1000);
-
-      const { error: subscriptionError } = await supabase
-        .from("user_subscriptions")
-        .insert({
-          user_id: user.id,
-          plan_id: planId,
-          credits_remaining: planData.credits,
-          total_credits: planData.credits,
-          expires_at: expiresAt.toISOString(),
-          status: "active"
-        });
-
-      if (subscriptionError) {
-        throw subscriptionError;
-      }
-
-      await refreshSubscription();
-      return { success: true };
+      return { error: "Erro ao criar sessão de pagamento" };
 
     } catch (error: any) {
       console.error("Erro ao processar compra:", error);
       return { error: error.message || "Erro ao processar compra" };
+    }
+  };
+
+  const verifyPayment = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke("verify-stripe-payment");
+      
+      if (error) throw error;
+      
+      if (data.hasActiveSubscription) {
+        await refreshSubscription();
+      }
+      
+      return data;
+    } catch (error: any) {
+      console.error("Erro ao verificar pagamento:", error);
+      return { error: error.message };
     }
   };
 
@@ -103,6 +71,7 @@ export function useBilling() {
   return {
     subscription,
     purchasePlan,
+    verifyPayment,
     hasCredits,
     canSendMessage,
     refreshSubscription
