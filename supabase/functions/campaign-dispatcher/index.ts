@@ -1,259 +1,212 @@
 
-import { createClient } from "npm:@supabase/supabase-js";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// CORS headers
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders })
   }
 
-  // Configure Supabase client for Edge Functions context
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const supabase = createClient(supabaseUrl, supabaseKey);
+  try {
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
 
-  // Evolution API configuration - usando configuração centralizada
-  const evolutionApiUrl = "https://api.ramelseg.com.br";
-  const evolutionApiKey = "d86920ba398e31464c46401214779885";
+    const { campaignId } = await req.json()
 
-  console.log("Evolution API Config:", { evolutionApiUrl, evolutionApiKey });
+    // Buscar dados da campanha com instância
+    const { data: campaign, error: campaignError } = await supabaseClient
+      .from('campaigns')
+      .select(`
+        *,
+        instance:instances(instance_name, user_id)
+      `)
+      .eq('id', campaignId)
+      .single()
 
-  // Horário atual em UTC para comparação
-  const nowUTC = new Date().toISOString();
-  console.log("Horário atual UTC:", nowUTC);
-  
-  // Converte para horário brasileiro (UTC-3) para logging
-  const nowBrazil = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
-  console.log("Horário atual Brasil (UTC-3):", nowBrazil);
+    if (campaignError || !campaign) {
+      throw new Error('Campanha não encontrada')
+    }
 
-  // Busca campanhas ativas OU agendadas que já passaram do horário
-  // Agora inclui o join com a tabela instances para pegar o instance_name
-  const { data: campaigns, error: campaignsError } = await supabase
-    .from("campaigns")
-    .select(`
-      *,
-      instances!inner(instance_name)
-    `)
-    .in("status", ["active", "scheduled"])
-    .or(`status.eq.active,and(status.eq.scheduled,scheduled_for.lte.${nowUTC})`)
-    .limit(1);
+    // Verificar se usuário tem créditos suficientes
+    const { data: subscription } = await supabaseClient
+      .from('user_subscriptions')
+      .select('credits_remaining, status, expires_at')
+      .eq('user_id', campaign.instance.user_id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
 
-  console.log("Campanhas encontradas:", campaigns?.length || 0);
-  if (campaigns && campaigns.length > 0) {
-    console.log("Primeira campanha:", {
-      id: campaigns[0].id,
-      status: campaigns[0].status,
-      scheduled_for: campaigns[0].scheduled_for,
-      name: campaigns[0].name,
-      instance_name: campaigns[0].instances?.instance_name
-    });
-  }
+    if (!subscription) {
+      throw new Error('Nenhuma assinatura ativa encontrada para o usuário')
+    }
 
-  if (campaignsError || !campaigns || campaigns.length === 0) {
-    return new Response(
-      JSON.stringify({ 
-        message: "Nenhuma campanha ativa ou agendada para disparo no momento.",
-        debug: {
-          nowUTC,
-          nowBrazil,
-          campaignsError
+    if (subscription.credits_remaining <= 0) {
+      throw new Error('Créditos insuficientes para envio')
+    }
+
+    if (subscription.expires_at && new Date(subscription.expires_at) < new Date()) {
+      throw new Error('Assinatura expirada')
+    }
+
+    // Buscar contatos da campanha
+    const { data: contacts, error: contactsError } = await supabaseClient
+      .from('contacts')
+      .select('*')
+      .in('id', campaign.contact_ids)
+
+    if (contactsError) {
+      throw new Error('Erro ao buscar contatos')
+    }
+
+    if (!contacts || contacts.length === 0) {
+      throw new Error('Nenhum contato encontrado para esta campanha')
+    }
+
+    // Verificar se há créditos suficientes para todos os contatos
+    if (subscription.credits_remaining < contacts.length) {
+      throw new Error(`Créditos insuficientes. Você tem ${subscription.credits_remaining} créditos, mas precisa de ${contacts.length} para esta campanha.`)
+    }
+
+    // Atualizar status da campanha para "sending"
+    await supabaseClient
+      .from('campaigns')
+      .update({ status: 'sending' })
+      .eq('id', campaignId)
+
+    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
+    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
+
+    if (!evolutionApiUrl || !evolutionApiKey) {
+      throw new Error('Configuração da Evolution API não encontrada')
+    }
+
+    let successCount = 0
+    let errorCount = 0
+
+    // Enviar mensagens para cada contato
+    for (const contact of contacts) {
+      try {
+        // Verificar se ainda há créditos antes de cada envio
+        const { data: currentSubscription } = await supabaseClient
+          .from('user_subscriptions')
+          .select('credits_remaining')
+          .eq('user_id', campaign.instance.user_id)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+
+        if (!currentSubscription || currentSubscription.credits_remaining <= 0) {
+          console.log('Créditos esgotados durante o envio')
+          break
         }
-      }),
-      { status: 200, headers: corsHeaders }
-    );
-  }
 
-  const campaign = campaigns[0];
-  
-  // Se a campanha está como "scheduled", muda para "active" automaticamente
-  if (campaign.status === "scheduled") {
-    console.log("Ativando campanha agendada:", campaign.id);
-    await supabase
-      .from("campaigns")
-      .update({ status: "active" })
-      .eq("id", campaign.id);
-  }
+        // Usar o nome da instância na URL
+        const url = `${evolutionApiUrl}/message/sendText/${campaign.instance.instance_name}`
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': evolutionApiKey
+          },
+          body: JSON.stringify({
+            number: contact.phone,
+            text: campaign.message
+          })
+        })
 
-  const pauseSeconds =
-    typeof campaign.pause_between_messages === "number"
-      ? campaign.pause_between_messages
-      : 5;
+        const responseData = await response.json()
 
-  // Busca mensagens pendentes dessa campanha
-  const { data: scheduleRows, error: scheduleError } = await supabase
-    .from("scheduled_messages")
-    .select(`
-      *,
-      contacts!inner(phone, name)
-    `)
-    .eq("campaign_id", campaign.id)
-    .eq("status", "pending")
-    .order("scheduled_for", { ascending: true })
-    .limit(1);
+        if (response.ok) {
+          // Decrementar crédito do usuário
+          const { error: creditError } = await supabaseClient
+            .rpc('decrement_user_credits', { user_id_param: campaign.instance.user_id })
 
-  console.log("Mensagens pendentes encontradas:", scheduleRows?.length || 0);
+          if (creditError) {
+            console.error('Erro ao decrementar créditos:', creditError)
+          }
 
-  if (scheduleError || !scheduleRows || scheduleRows.length === 0) {
-    console.log("Nenhuma mensagem pendente, marcando campanha como concluída");
-    // Marca a campanha como completed se não houver mais mensagens pendentes
-    await supabase
-      .from("campaigns")
-      .update({ status: "completed" })
-      .eq("id", campaign.id);
-    return new Response(
-      JSON.stringify({
-        message: "Não há mensagens pendentes, campanha concluída.",
-        debug: {
-          campaign_id: campaign.id,
-          scheduleError
+          // Log de sucesso
+          await supabaseClient
+            .from('messages_log')
+            .insert({
+              campaign_id: campaignId,
+              contact_id: contact.id,
+              phone: contact.phone,
+              message: campaign.message,
+              status: 'sent',
+              response: responseData,
+              sent_at: new Date().toISOString()
+            })
+
+          successCount++
+        } else {
+          throw new Error(responseData.message || 'Erro na API')
         }
-      }),
-      { status: 200, headers: corsHeaders }
-    );
-  }
 
-  const messageRow = scheduleRows[0];
-  const contact = messageRow.contacts;
+      } catch (error) {
+        console.error(`Erro ao enviar para ${contact.phone}:`, error)
+        
+        // Log de erro
+        await supabaseClient
+          .from('messages_log')
+          .insert({
+            campaign_id: campaignId,
+            contact_id: contact.id,
+            phone: contact.phone,
+            message: campaign.message,
+            status: 'failed',
+            response: { error: error.message },
+            sent_at: new Date().toISOString()
+          })
 
-  // Pega o telefone do contato relacionado
-  const destinationPhone = contact.phone.replace(/^\+/, "");
-
-  // Agora usa o instance_name do join da campanha
-  const instanceName = campaign.instances?.instance_name;
-  if (!instanceName) {
-    console.log("Erro: instance_name não encontrado para a campanha:", campaign.id);
-    return new Response(
-      JSON.stringify({
-        error: "Instance name não encontrado para esta campanha",
-        debug: {
-          campaign_id: campaign.id,
-          instance_id: campaign.instance_id,
-          instances_data: campaign.instances
-        }
-      }),
-      { status: 400, headers: corsHeaders }
-    );
-  }
-
-  // URL correta da Evolution API com instance_name
-  const evolutionUrl = `${evolutionApiUrl}/message/sendText/${instanceName}`;
-  
-  const sendBody = {
-    number: destinationPhone,
-    text: messageRow.message,
-  };
-
-  console.log("Enviando mensagem:", {
-    url: evolutionUrl,
-    instance_name: instanceName,
-    contact_name: contact.name,
-    phone: destinationPhone,
-    message_preview: messageRow.message.substring(0, 50) + "..."
-  });
-
-  // Envio pela Evolution API
-  const evolutionResp = await fetch(evolutionUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: evolutionApiKey,
-    },
-    body: JSON.stringify(sendBody),
-  });
-
-  const respData = await evolutionResp.json();
-  console.log("Resposta da Evolution API:", { 
-    status: evolutionResp.status, 
-    success: evolutionResp.ok,
-    data: respData 
-  });
-
-  // Atualiza status da mensagem como enviada ou erro
-  const nowISO = new Date().toISOString();
-
-  if (evolutionResp.ok) {
-    await supabase
-      .from("scheduled_messages")
-      .update({
-        status: "sent",
-        sent_at: nowISO,
-      })
-      .eq("id", messageRow.id);
-
-    await supabase
-      .from("messages_log")
-      .insert([
-        {
-          campaign_id: campaign.id,
-          contact_id: messageRow.contact_id,
-          phone: destinationPhone,
-          message: messageRow.message,
-          status: "sent",
-          sent_at: nowISO,
-          response: respData,
-        },
-      ]);
-
-    console.log(`Mensagem enviada com sucesso para ${contact.name} (${destinationPhone})`);
-  } else {
-    await supabase
-      .from("scheduled_messages")
-      .update({
-        status: "failed",
-      })
-      .eq("id", messageRow.id);
-
-    await supabase
-      .from("messages_log")
-      .insert([
-        {
-          campaign_id: campaign.id,
-          contact_id: messageRow.contact_id,
-          phone: destinationPhone,
-          message: messageRow.message,
-          status: "failed",
-          sent_at: nowISO,
-          response: respData,
-        },
-      ]);
-    
-    console.log(`Falha ao enviar mensagem para ${contact.name} (${destinationPhone}):`, respData);
-    
-    return new Response(
-      JSON.stringify({
-        error: "Falha ao enviar mensagem via Evolution API",
-        respData,
-        debug: {
-          contact_name: contact.name,
-          phone: destinationPhone,
-          url: evolutionUrl,
-          instance_name: instanceName
-        }
-      }),
-      { status: 500, headers: corsHeaders }
-    );
-  }
-
-  // Espera pelo intervalo desejado (pausa entre mensagens)
-  await new Promise((res) => setTimeout(res, pauseSeconds * 1000));
-
-  return new Response(
-    JSON.stringify({ 
-      success: true, 
-      message: "Mensagem enviada", 
-      details: {
-        contact_name: contact.name,
-        phone: destinationPhone,
-        campaign: campaign.name,
-        instance_name: instanceName
+        errorCount++
       }
-    }),
-    { status: 200, headers: corsHeaders }
-  );
-});
+
+      // Pausar entre mensagens se configurado
+      if (campaign.pause_between_messages > 0) {
+        await new Promise(resolve => setTimeout(resolve, campaign.pause_between_messages * 1000))
+      }
+    }
+
+    // Atualizar status final da campanha
+    const finalStatus = errorCount === 0 ? 'sent' : (successCount === 0 ? 'failed' : 'sent')
+    await supabaseClient
+      .from('campaigns')
+      .update({ status: finalStatus })
+      .eq('id', campaignId)
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        successCount,
+        errorCount,
+        message: `Campanha processada. ${successCount} mensagens enviadas, ${errorCount} erros.`
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+
+  } catch (error) {
+    console.error('Erro no campaign-dispatcher:', error)
+    
+    return new Response(
+      JSON.stringify({
+        error: error.message,
+        success: false
+      }),
+      { 
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
+  }
+})

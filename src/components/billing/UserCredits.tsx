@@ -3,23 +3,47 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { CreditCard, MessageSquare, Calendar } from "lucide-react";
+import { CreditCard, MessageSquare, Calendar, AlertTriangle } from "lucide-react";
+import { useUserSubscription } from "@/hooks/useUserSubscription";
 
-interface UserCreditsProps {
-  credits: number;
-  totalCredits: number;
-  plan: string;
-  expiresAt?: string;
-}
+const UserCredits: React.FC = () => {
+  const { subscription, loading } = useUserSubscription();
+  
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
+            <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
-const UserCredits: React.FC<UserCreditsProps> = ({ 
-  credits, 
-  totalCredits, 
-  plan, 
-  expiresAt 
-}) => {
-  const usedCredits = totalCredits - credits;
-  const progressPercentage = totalCredits > 0 ? (usedCredits / totalCredits) * 100 : 0;
+  if (!subscription) {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-base font-medium">Seus Créditos</CardTitle>
+          <CreditCard className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-sm text-red-800">
+                ❌ Nenhuma assinatura ativa encontrada
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const usedCredits = subscription.total_credits - subscription.credits_remaining;
+  const progressPercentage = subscription.total_credits > 0 ? (usedCredits / subscription.total_credits) * 100 : 0;
   
   const planNames: { [key: string]: string } = {
     "trial": "Teste Gratuito",
@@ -33,6 +57,9 @@ const UserCredits: React.FC<UserCreditsProps> = ({
     "master": "bg-purple-100 text-purple-800"
   };
 
+  const isExpired = subscription.expires_at && new Date(subscription.expires_at) < new Date();
+  const isLowCredits = subscription.credits_remaining <= 10 && subscription.plan.name !== "trial";
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -44,11 +71,11 @@ const UserCredits: React.FC<UserCreditsProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <MessageSquare className="h-4 w-4 text-green-600" />
-              <span className="text-2xl font-bold">{credits}</span>
-              <span className="text-sm text-gray-500">de {totalCredits}</span>
+              <span className="text-2xl font-bold">{subscription.credits_remaining}</span>
+              <span className="text-sm text-gray-500">de {subscription.total_credits}</span>
             </div>
-            <Badge className={planColors[plan] || "bg-gray-100 text-gray-800"}>
-              {planNames[plan] || plan}
+            <Badge className={planColors[subscription.plan.name] || "bg-gray-100 text-gray-800"}>
+              {planNames[subscription.plan.name] || subscription.plan.name}
             </Badge>
           </div>
           
@@ -60,18 +87,32 @@ const UserCredits: React.FC<UserCreditsProps> = ({
             <Progress value={progressPercentage} className="h-2" />
           </div>
           
-          {expiresAt && (
+          {subscription.expires_at && (
             <div className="flex items-center text-sm text-gray-600">
               <Calendar className="h-4 w-4 mr-1" />
-              Expira em: {new Date(expiresAt).toLocaleDateString('pt-BR')}
+              Expira em: {new Date(subscription.expires_at).toLocaleDateString('pt-BR')}
             </div>
           )}
           
-          {credits <= 10 && plan !== "trial" && (
+          {isExpired && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <div className="flex items-center">
+                <AlertTriangle className="h-4 w-4 text-red-600 mr-2" />
+                <p className="text-sm text-red-800">
+                  Plano expirado! Renove para continuar enviando mensagens.
+                </p>
+              </div>
+            </div>
+          )}
+          
+          {isLowCredits && !isExpired && (
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-              <p className="text-sm text-orange-800">
-                ⚠️ Poucos créditos restantes! Considere renovar seu plano.
-              </p>
+              <div className="flex items-center">
+                <AlertTriangle className="h-4 w-4 text-orange-600 mr-2" />
+                <p className="text-sm text-orange-800">
+                  Poucos créditos restantes! Considere renovar seu plano.
+                </p>
+              </div>
             </div>
           )}
         </div>

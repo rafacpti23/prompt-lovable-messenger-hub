@@ -401,6 +401,39 @@ export type Database = {
         }
         Relationships: []
       }
+      plans: {
+        Row: {
+          created_at: string
+          credits: number
+          duration_days: number
+          id: string
+          is_active: boolean | null
+          name: string
+          price: number
+          price_per_message: number
+        }
+        Insert: {
+          created_at?: string
+          credits: number
+          duration_days: number
+          id?: string
+          is_active?: boolean | null
+          name: string
+          price: number
+          price_per_message: number
+        }
+        Update: {
+          created_at?: string
+          credits?: number
+          duration_days?: number
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          price?: number
+          price_per_message?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -684,6 +717,94 @@ export type Database = {
           },
         ]
       }
+      transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          payment_id: string | null
+          payment_method: string | null
+          plan_id: string
+          status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          payment_id?: string | null
+          payment_method?: string | null
+          plan_id: string
+          status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          payment_id?: string | null
+          payment_method?: string | null
+          plan_id?: string
+          status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_subscriptions: {
+        Row: {
+          created_at: string
+          credits_remaining: number
+          expires_at: string | null
+          id: string
+          plan_id: string
+          status: string | null
+          total_credits: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_remaining?: number
+          expires_at?: string | null
+          id?: string
+          plan_id: string
+          status?: string | null
+          total_credits?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_remaining?: number
+          expires_at?: string | null
+          id?: string
+          plan_id?: string
+          status?: string | null
+          total_credits?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           created_at: string | null
@@ -792,7 +913,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      decrement_user_credits: {
+        Args: { user_id_param: string }
+        Returns: boolean
+      }
     }
     Enums: {
       delivery_status:

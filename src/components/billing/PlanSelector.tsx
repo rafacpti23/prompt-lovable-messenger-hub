@@ -1,69 +1,108 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Star } from "lucide-react";
+import { Check, Star, Loader2 } from "lucide-react";
+import { usePlans } from "@/hooks/usePlans";
+import { useBilling } from "@/hooks/useBilling";
+import { toast } from "sonner";
 
-interface PlanSelectorProps {
-  selectedPlan?: string;
-  onSelectPlan: (planId: string) => void;
-}
+const PlanSelector: React.FC = () => {
+  const { plans, loading: plansLoading } = usePlans();
+  const { purchasePlan } = useBilling();
+  const [purchasing, setPurchasing] = useState<string | null>(null);
 
-const PlanSelector: React.FC<PlanSelectorProps> = ({ selectedPlan, onSelectPlan }) => {
-  const plans = [
-    {
-      id: "trial",
-      name: "Teste Gratuito",
-      price: "R$ 0,00",
-      duration: "1 dia",
-      messages: 10,
-      description: "Para testar o sistema",
-      features: [
-        "10 mensagens grátis",
-        "1 instância WhatsApp",
-        "Suporte básico",
-        "Válido por 1 dia"
-      ],
-      popular: false,
-      pricePerMessage: "Grátis"
-    },
-    {
-      id: "starter",
-      name: "Plano Starter",
-      price: "R$ 49,90",
-      duration: "/mês",
-      messages: 1000,
-      description: "Ideal para pequenos negócios",
-      features: [
-        "1.000 mensagens/mês",
-        "Até 3 instâncias WhatsApp",
-        "Campanhas automáticas",
-        "Suporte prioritário",
-        "Relatórios básicos"
-      ],
-      popular: true,
-      pricePerMessage: "R$ 0,05"
-    },
-    {
-      id: "master",
-      name: "Plano Master",
-      price: "R$ 79,90",
-      duration: "/mês",
-      messages: 2000,
-      description: "Para empresas em crescimento",
-      features: [
-        "2.000 mensagens/mês",
-        "Instâncias ilimitadas",
-        "Campanhas automáticas",
-        "Suporte 24/7",
-        "Relatórios avançados",
-        "API personalizada"
-      ],
-      popular: false,
-      pricePerMessage: "R$ 0,04"
+  const handleSelectPlan = async (planId: string) => {
+    setPurchasing(planId);
+    
+    try {
+      const result = await purchasePlan(planId);
+      
+      if (result.error) {
+        toast.error(`Erro: ${result.error}`);
+      } else {
+        toast.success("Plano ativado com sucesso!");
+      }
+    } catch (error) {
+      toast.error("Erro ao processar compra");
+    } finally {
+      setPurchasing(null);
     }
-  ];
+  };
+
+  if (plansLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-1/2 mx-auto mb-2"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/3 mx-auto"></div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="p-6">
+                <div className="h-32 bg-gray-200 rounded"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const planDetails = plans.map(plan => {
+    let description = "";
+    let features: string[] = [];
+    let popular = false;
+
+    switch (plan.name) {
+      case "trial":
+        description = "Para testar o sistema";
+        features = [
+          `${plan.credits} mensagens grátis`,
+          "1 instância WhatsApp",
+          "Suporte básico",
+          `Válido por ${plan.duration_days} dia${plan.duration_days > 1 ? 's' : ''}`
+        ];
+        break;
+      case "starter":
+        description = "Ideal para pequenos negócios";
+        popular = true;
+        features = [
+          `${plan.credits.toLocaleString()} mensagens/mês`,
+          "Até 3 instâncias WhatsApp",
+          "Campanhas automáticas",
+          "Suporte prioritário",
+          "Relatórios básicos"
+        ];
+        break;
+      case "master":
+        description = "Para empresas em crescimento";
+        features = [
+          `${plan.credits.toLocaleString()} mensagens/mês`,
+          "Instâncias ilimitadas",
+          "Campanhas automáticas",
+          "Suporte 24/7",
+          "Relatórios avançados",
+          "API personalizada"
+        ];
+        break;
+      default:
+        description = "Plano personalizado";
+        features = [`${plan.credits} mensagens`];
+    }
+
+    return {
+      ...plan,
+      description,
+      features,
+      popular,
+      pricePerMessage: `R$ ${plan.price_per_message.toFixed(4).replace('.', ',')}`
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -75,16 +114,10 @@ const PlanSelector: React.FC<PlanSelectorProps> = ({ selectedPlan, onSelectPlan 
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {plans.map((plan) => (
+        {planDetails.map((plan) => (
           <Card 
             key={plan.id}
-            className={`relative ${
-              selectedPlan === plan.id 
-                ? "ring-2 ring-green-500" 
-                : plan.popular 
-                  ? "ring-2 ring-blue-500" 
-                  : ""
-            }`}
+            className={`relative ${plan.popular ? "ring-2 ring-blue-500" : ""}`}
           >
             {plan.popular && (
               <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
@@ -96,14 +129,22 @@ const PlanSelector: React.FC<PlanSelectorProps> = ({ selectedPlan, onSelectPlan 
             )}
             
             <CardHeader className="text-center">
-              <CardTitle className="text-xl font-bold">{plan.name}</CardTitle>
+              <CardTitle className="text-xl font-bold capitalize">
+                {plan.name === "trial" ? "Teste Gratuito" : 
+                 plan.name === "starter" ? "Plano Starter" :
+                 plan.name === "master" ? "Plano Master" : plan.name}
+              </CardTitle>
               <div className="mt-4">
-                <span className="text-3xl font-bold text-green-600">{plan.price}</span>
-                <span className="text-gray-500">{plan.duration}</span>
+                <span className="text-3xl font-bold text-green-600">
+                  R$ {plan.price.toFixed(2).replace('.', ',')}
+                </span>
+                <span className="text-gray-500">
+                  {plan.name === "trial" ? "" : "/mês"}
+                </span>
               </div>
               <p className="text-sm text-gray-600 dark:text-gray-300">{plan.description}</p>
               <div className="text-sm text-blue-600 font-medium">
-                {plan.pricePerMessage} por mensagem
+                {plan.name === "trial" ? "Grátis" : `${plan.pricePerMessage} por mensagem`}
               </div>
             </CardHeader>
             
@@ -119,10 +160,17 @@ const PlanSelector: React.FC<PlanSelectorProps> = ({ selectedPlan, onSelectPlan 
               
               <Button
                 className="w-full mt-6"
-                variant={selectedPlan === plan.id ? "default" : "outline"}
-                onClick={() => onSelectPlan(plan.id)}
+                onClick={() => handleSelectPlan(plan.id)}
+                disabled={purchasing === plan.id}
               >
-                {selectedPlan === plan.id ? "Selecionado" : "Selecionar Plano"}
+                {purchasing === plan.id ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Processando...
+                  </>
+                ) : (
+                  "Selecionar Plano"
+                )}
               </Button>
             </CardContent>
           </Card>

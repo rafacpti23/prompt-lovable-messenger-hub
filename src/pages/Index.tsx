@@ -4,13 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, Users, Send, BarChart3, Settings, Moon, Sun } from "lucide-react";
+import { MessageSquare, Users, Send, BarChart3, Settings, Moon, Sun, CreditCard } from "lucide-react";
 import { useAuth, AuthProvider } from "@/components/auth/AuthProvider";
 import LoginForm from "@/components/auth/LoginForm";
 import Dashboard from "@/components/dashboard/Dashboard";
 import InstancesManager from "@/components/instances/InstancesManager";
 import ContactsManager from "@/components/contacts/ContactsManager";
 import CampaignsManager from "@/components/campaigns/CampaignsManager";
+import BillingManager from "@/components/billing/BillingManager";
 import SettingsModal from "@/components/settings/SettingsModal";
 import { supabase } from "@/integrations/supabase/client";
 import WhatsAppLogosBG from "@/components/WhatsAppLogosBG";
@@ -161,7 +162,7 @@ const MainApp = () => {
         {/* Main Content */}
         <main className="relative flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 z-10">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4 lg:w-fit lg:grid-cols-4 bg-white dark:bg-gray-800 shadow-sm">
+            <TabsList className="grid w-full grid-cols-5 lg:w-fit lg:grid-cols-5 bg-white dark:bg-gray-800 shadow-sm">
               <TabsTrigger value="dashboard" className="flex items-center space-x-2">
                 <BarChart3 className="h-4 w-4" />
                 <span className="hidden sm:inline">Dashboard</span>
@@ -177,6 +178,10 @@ const MainApp = () => {
               <TabsTrigger value="campaigns" className="flex items-center space-x-2">
                 <Send className="h-4 w-4" />
                 <span className="hidden sm:inline">Campanhas</span>
+              </TabsTrigger>
+              <TabsTrigger value="billing" className="flex items-center space-x-2">
+                <CreditCard className="h-4 w-4" />
+                <span className="hidden sm:inline">Cobrança</span>
               </TabsTrigger>
             </TabsList>
 
@@ -199,6 +204,9 @@ const MainApp = () => {
               <CampaignsManager
                 contactGroups={groups}
               />
+            </TabsContent>
+            <TabsContent value="billing" className="min-h-[600px]">
+              <BillingManager />
             </TabsContent>
           </Tabs>
         </main>

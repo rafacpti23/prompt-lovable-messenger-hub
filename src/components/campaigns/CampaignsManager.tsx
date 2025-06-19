@@ -1,468 +1,83 @@
-import { useState, useEffect } from "react";
-import { Send } from "lucide-react";
+
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Plus, AlertTriangle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import CampaignForm from "./CampaignForm";
 import CampaignList from "./CampaignList";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-
-interface CampaignDB {
-  id: string;
-  name: string;
-  message: string;
-  status: string;
-  created_at?: string;
-  sent: number;
-  total: number;
-}
-
-interface Instance {
-  id: string;
-  instance_name: string;
-  status: string | null;
-  phone_number?: string | null;
-  user_id: string;
-}
+import { useBilling } from "@/hooks/useBilling";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface CampaignsManagerProps {
   contactGroups: string[];
 }
 
-const GOOGLE_STORAGE_KEY = "googleContactsSheetId";
-
 const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) => {
-  const [newCampaign, setNewCampaign] = useState({ name: "", message: "" });
-  const [contactSource, setContactSource] = useState<"supabase" | "google">("supabase");
-  const [googleConnected, setGoogleConnected] = useState<boolean>(false);
-  const [googleSheetName, setGoogleSheetName] = useState<string | null>(null);
-  const [scheduleType, setScheduleType] = useState<"once" | "recurring">("once");
-  const [scheduleDate, setScheduleDate] = useState("");
-  const [scheduleTime, setScheduleTime] = useState("");
-  const [recurringInterval, setRecurringInterval] = useState<number>(7);
-  const [selectedGroup, setSelectedGroup] = useState("Todos os contatos");
-  const [selectedInstanceId, setSelectedInstanceId] = useState<string>("");
-  const [instances, setInstances] = useState<Instance[]>([]);
-  const [loadingInstances, setLoadingInstances] = useState(true);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const { canSendMessage, subscription } = useBilling();
 
-  const { toast } = useToast();
-
-  // Busca e mantém instâncias do Supabase atualizadas em tempo real - APENAS DO USUÁRIO ATUAL
-  useEffect(() => {
-    let channel: any;
-    async function fetchAndSubscribeInstances() {
-      setLoadingInstances(true);
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setInstances([]);
-        setLoadingInstances(false);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("instances")
-        .select("*")
-        .eq("user_id", user.id) // Filtrar apenas instâncias do usuário atual
-        .order("created_at", { ascending: false });
-        
-      if (!error && data) setInstances(data);
-      setLoadingInstances(false);
-      
-      channel = supabase
-        .channel('public:instances:campaigns')
-        .on(
-          'postgres_changes',
-          { 
-            event: '*', 
-            schema: 'public', 
-            table: 'instances',
-            filter: `user_id=eq.${user.id}` // Filtrar apenas do usuário atual
-          },
-          (payload) => {
-            fetchAndSubscribeInstances();
-          }
-        )
-        .subscribe();
-    }
-    fetchAndSubscribeInstances();
-    return () => {
-      if (channel) supabase.removeChannel(channel);
-    };
-  }, []);
-
-  // Estado centralizado para campanhas
-  const [campaigns, setCampaigns] = useState<CampaignDB[]>([]);
-  const [loadingCampaigns, setLoadingCampaigns] = useState(true);
-
-  // Busca campanhas do Supabase
-  useEffect(() => {
-    async function fetchCampaigns() {
-      setLoadingCampaigns(true);
-      const { data, error } = await supabase
-        .from("campaigns")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (!error && data) {
-        // Mapeia os dados do banco para o formato esperado por CampaignList
-        const mappedCampaigns = data.map((campaign) => ({
-          id: campaign.id,
-          name: campaign.name,
-          message: campaign.message,
-          status: campaign.status || "draft",
-          created_at: campaign.created_at,
-          sent: 0, // Valor padrão, ajuste conforme necessário
-          total: 0, // Valor padrão, ajuste conforme necessário
-        }));
-        setCampaigns(mappedCampaigns);
-      }
-      setLoadingCampaigns(false);
-    }
-    fetchCampaigns();
-  }, []);
-
-  useEffect(() => {
-    const sheetId = localStorage.getItem(GOOGLE_STORAGE_KEY);
-    if (sheetId) {
-      setGoogleConnected(true);
-      setGoogleSheetName(sheetId);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (instances.length > 0) {
-      setSelectedInstanceId(instances[0].id);
-    }
-  }, [instances]);
-
-  const handleConnectGoogle = () => {
-    const fakeSheetId = "MinhaPlanilhaContatosGoogle";
-    setGoogleConnected(true);
-    setGoogleSheetName(fakeSheetId);
-    localStorage.setItem(GOOGLE_STORAGE_KEY, fakeSheetId);
-    toast({
-      title: "Google Sheets conectado",
-      description: "Planilha de contatos vinculada com sucesso.",
-    });
-  };
-
-  const createCampaign = async () => {
-    if (!newCampaign.name || !newCampaign.message) {
-      toast({
-        title: "Erro",
-        description: "Nome e mensagem são obrigatórios",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!selectedInstanceId) {
-      toast({
-        title: "Selecione uma instância",
-        description: "É preciso escolher uma instância conectada.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      // Primeiro busca o usuário atual
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({
-          title: "Erro de autenticação",
-          description: "É necessário estar logado para criar campanha.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Busca todos os contatos do usuário para popular contact_ids
-      const { data: contacts, error: contactsError } = await supabase
-        .from("contacts")
-        .select("id, phone")
-        .eq("user_id", user.id);
-
-      if (contactsError) {
-        toast({
-          title: "Erro ao buscar contatos",
-          description: contactsError.message,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const contactIds = contacts ? contacts.map(c => c.id) : [];
-
-      if (contactIds.length === 0) {
-        toast({
-          title: "Nenhum contato encontrado",
-          description: "Adicione contatos antes de criar uma campanha.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Calcula o horário agendado se fornecido
-      let scheduledForSaoPaulo = null;
-      let brasilDateTime = null;
-      
-      if (scheduleDate && scheduleTime) {
-        // Cria o datetime no formato de São Paulo (UTC-3)
-        scheduledForSaoPaulo = `${scheduleDate} ${scheduleTime}:00-03`;
-        brasilDateTime = new Date(`${scheduleDate}T${scheduleTime}:00`);
-        
-        console.log("Horário digitado (Brasília):", `${scheduleDate} ${scheduleTime}:00`);
-        console.log("Horário salvo no banco (São Paulo UTC-3):", scheduledForSaoPaulo);
-      } else {
-        // Se não tem horário definido, agenda para agora
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        const seconds = String(now.getSeconds()).padStart(2, '0');
-        
-        scheduledForSaoPaulo = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}-03`;
-        brasilDateTime = now;
-      }
-
-      const insertObj = {
-        user_id: user.id,
-        name: newCampaign.name,
-        message: newCampaign.message,
-        status: "draft",
-        instance_id: selectedInstanceId,
-        contact_ids: contactIds,
-        scheduled_for: scheduledForSaoPaulo,
-      };
-
-      const { data, error } = await supabase
-        .from("campaigns")
-        .insert([insertObj])
-        .select()
-        .single();
-
-      if (error) {
-        toast({
-          title: "Erro",
-          description: `Erro ao criar campanha: ${error.message}`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Criar scheduled_messages para cada contato com o telefone correto
-      const scheduledMessages = contacts.map(contact => ({
-        campaign_id: data.id,
-        contact_id: contact.id,
-        phone: contact.phone,
-        message: newCampaign.message,
-        scheduled_for: scheduledForSaoPaulo,
-        status: 'pending'
-      }));
-
-      const { error: scheduleError } = await supabase
-        .from("scheduled_messages")
-        .insert(scheduledMessages);
-
-      if (scheduleError) {
-        console.error("Erro ao criar mensagens agendadas:", scheduleError);
-        toast({
-          title: "Erro",
-          description: `Erro ao agendar mensagens: ${scheduleError.message}`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      console.log("Mensagens agendadas criadas:", scheduledMessages.length);
-
-      setNewCampaign({ name: "", message: "" });
-      setScheduleDate("");
-      setScheduleTime("");
-      setSelectedGroup("Todos os contatos");
-      
-      const messageText = scheduledForSaoPaulo && brasilDateTime
-        ? `Campanha ${newCampaign.name} criada e agendada para ${brasilDateTime.toLocaleString('pt-BR')} (horário de Brasília)`
-        : `Campanha ${newCampaign.name} criada com ${contactIds.length} contatos`;
-        
-      toast({
-        title: "Campanha criada",
-        description: messageText,
-      });
-
-      setCampaigns(prev => [
-        {
-          id: data.id,
-          name: data.name,
-          message: data.message,
-          status: data.status || "draft",
-          created_at: data.created_at,
-          sent: 0,
-          total: contactIds.length,
-        },
-        ...prev,
-      ]);
-
-    } catch (err: any) {
-      toast({
-        title: "Erro",
-        description: `Erro inesperado: ${err.message}`,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const deleteCampaign = async (id: string) => {
-    const { error } = await supabase.from("campaigns").delete().eq("id", id);
-    if (error) {
-      toast({
-        title: "Erro ao remover campanha",
-        description: error.message,
-        variant: "destructive",
-      });
-      return;
-    }
-    setCampaigns((prev: any) => prev.filter((campaign: any) => campaign.id !== id));
-    toast({
-      title: "Campanha removida",
-      description: "Campanha deletada com sucesso",
-    });
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "bg-green-100 text-green-800";
-      case "paused":
-        return "bg-yellow-100 text-yellow-800";
-      case "completed":
-        return "bg-blue-100 text-blue-800";
-      case "draft":
-        return "bg-gray-100 text-gray-800";
-      case "scheduled":
-        return "bg-orange-100 text-orange-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case "active":
-        return "Ativa";
-      case "paused":
-        return "Pausada";
-      case "completed":
-        return "Concluída";
-      case "draft":
-        return "Rascunho";
-      case "scheduled":
-        return "Agendada";
-      default:
-        return "Desconhecido";
-    }
-  };
-
-  // Função para iniciar campanha
-  const startCampaign = async (id: string) => {
-    // Busca a campanha para verificar se tem horário agendado
-    const { data: campaign } = await supabase
-      .from("campaigns")
-      .select("scheduled_for")
-      .eq("id", id)
-      .single();
-    
-    let scheduledForSaoPaulo;
-    
-    if (campaign?.scheduled_for) {
-      // Se já tem horário agendado, usa ele
-      scheduledForSaoPaulo = campaign.scheduled_for;
-    } else {
-      // Se não tem horário agendado, agenda para agora no timezone de São Paulo
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      const hours = String(now.getHours()).padStart(2, '0');
-      const minutes = String(now.getMinutes()).padStart(2, '0');
-      const seconds = String(now.getSeconds()).padStart(2, '0');
-      
-      scheduledForSaoPaulo = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}-03`;
-    }
-    
-    const { error } = await supabase
-      .from("campaigns")
-      .update({ 
-        status: "scheduled", 
-        scheduled_for: scheduledForSaoPaulo
-      })
-      .eq("id", id);
-      
-    if (error) {
-      toast({
-        title: "Erro ao iniciar campanha",
-        description: error.message,
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setCampaigns((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, status: "scheduled" } : c))
-    );
-    
-    // Parse da data para mostrar ao usuário
-    const scheduledDate = new Date(scheduledForSaoPaulo.replace('-03', ''));
-    
-    toast({
-      title: "Campanha agendada",
-      description: `A campanha foi agendada para ${scheduledDate.toLocaleString('pt-BR')} (horário de Brasília)`,
-    });
+  const handleCampaignCreated = () => {
+    setShowCreateForm(false);
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Send className="h-6 w-6 text-green-600" />
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Gerenciar Campanhas</h2>
+          <p className="text-gray-600 dark:text-gray-300">
+            Crie e gerencie suas campanhas de mensagens
+          </p>
         </div>
+        
+        <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>
+          <DialogTrigger asChild>
+            <Button disabled={!canSendMessage()}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Campanha
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Criar Nova Campanha</DialogTitle>
+            </DialogHeader>
+            <CampaignForm 
+              contactGroups={contactGroups}
+              onSuccess={handleCampaignCreated}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
-      <CampaignForm
-        newCampaign={newCampaign}
-        setNewCampaign={setNewCampaign}
-        contactSource={contactSource}
-        setContactSource={setContactSource}
-        googleConnected={googleConnected}
-        googleSheetName={googleSheetName}
-        handleConnectGoogle={() => {}}
-        setGoogleConnected={setGoogleConnected}
-        setGoogleSheetName={setGoogleSheetName}
-        supabaseGroups={contactGroups.length > 0 ? contactGroups : ["Todos os contatos"]}
-        googleSheetGroups={["Todos os contatos", "Ativos", "Leads", "Pós-venda"]}
-        selectedGroup={selectedGroup}
-        setSelectedGroup={setSelectedGroup}
-        scheduleType={scheduleType}
-        setScheduleType={setScheduleType}
-        scheduleDate={scheduleDate}
-        setScheduleDate={setScheduleDate}
-        scheduleTime={scheduleTime}
-        setScheduleTime={setScheduleTime}
-        recurringInterval={recurringInterval}
-        setRecurringInterval={setRecurringInterval}
-        createCampaign={createCampaign}
-        instances={instances}
-        selectedInstanceId={selectedInstanceId}
-        setSelectedInstanceId={setSelectedInstanceId}
-      />
-      <CampaignList
-        campaigns={campaigns}
-        deleteCampaign={deleteCampaign}
-        getStatusColor={getStatusColor}
-        getStatusText={getStatusText}
-        onStartCampaign={startCampaign}
-      />
+
+      {/* Alertas sobre créditos */}
+      {!canSendMessage() && (
+        <Alert className="border-orange-200 bg-orange-50">
+          <AlertTriangle className="h-4 w-4 text-orange-600" />
+          <AlertDescription className="text-orange-800">
+            {!subscription ? (
+              "Você não possui uma assinatura ativa. Adquira um plano para criar campanhas."
+            ) : subscription.credits_remaining <= 0 ? (
+              "Você não possui créditos suficientes para criar campanhas. Renove seu plano."
+            ) : subscription.expires_at && new Date(subscription.expires_at) < new Date() ? (
+              "Sua assinatura expirou. Renove para continuar criando campanhas."
+            ) : (
+              "Não é possível criar campanhas no momento."
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {subscription && subscription.credits_remaining <= 10 && subscription.credits_remaining > 0 && (
+        <Alert className="border-yellow-200 bg-yellow-50">
+          <AlertTriangle className="h-4 w-4 text-yellow-600" />
+          <AlertDescription className="text-yellow-800">
+            Atenção: Você possui apenas {subscription.credits_remaining} crédito(s) restante(s). 
+            Considere renovar seu plano.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <CampaignList />
     </div>
   );
 };
