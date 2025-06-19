@@ -87,8 +87,16 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
 
       handleCampaignCreated();
       
-      // Atualizar lista de campanhas
-      setCampaigns(prev => [data, ...prev]);
+      // Atualizar lista de campanhas com os campos sent e total
+      setCampaigns(prev => [{
+        id: data.id,
+        name: data.name,
+        message: data.message,
+        status: data.status || "draft",
+        created_at: data.created_at,
+        sent: 0,
+        total: 0,
+      }, ...prev]);
     } catch (error: any) {
       toast({
         title: "Erro ao criar campanha",
