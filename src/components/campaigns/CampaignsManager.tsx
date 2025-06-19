@@ -6,7 +6,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import CampaignForm from "./CampaignForm";
 import CampaignList from "./CampaignList";
 import { useBilling } from "@/hooks/useBilling";
+import { useCampaignList } from "@/hooks/useCampaignList";
+import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 interface CampaignsManagerProps {
   contactGroups: string[];
@@ -15,9 +19,154 @@ interface CampaignsManagerProps {
 const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const { canSendMessage, subscription } = useBilling();
+  const { toast } = useToast();
+  const { campaigns, setCampaigns } = useCampaignList(toast);
+  const { user } = useAuth();
+
+  // Estados para o formulário
+  const [newCampaign, setNewCampaign] = useState({ name: "", message: "" });
+  const [contactSource, setContactSource] = useState<"supabase" | "google">("supabase");
+  const [googleConnected, setGoogleConnected] = useState(false);
+  const [googleSheetName, setGoogleSheetName] = useState<string | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState("");
+  const [scheduleType, setScheduleType] = useState<"once" | "recurring">("once");
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("");
+  const [recurringInterval, setRecurringInterval] = useState(1);
+  const [selectedInstanceId, setSelectedInstanceId] = useState("");
+
+  // Mock data para desenvolvimento
+  const instances = [
+    { id: "1", instance_name: "Instância Principal", status: "connected" },
+    { id: "2", instance_name: "Instância Secundária", status: "disconnected" }
+  ];
 
   const handleCampaignCreated = () => {
     setShowCreateForm(false);
+    // Resetar formulário
+    setNewCampaign({ name: "", message: "" });
+    setSelectedGroup("");
+  };
+
+  const handleConnectGoogle = () => {
+    // Implementar conexão com Google Sheets
+    setGoogleConnected(true);
+    setGoogleSheetName("Planilha de Contatos");
+  };
+
+  const createCampaign = async () => {
+    if (!user || !newCampaign.name || !newCampaign.message || !selectedInstanceId) {
+      toast({
+        title: "Erro",
+        description: "Preencha todos os campos obrigatórios",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("campaigns")
+        .insert({
+          user_id: user.id,
+          instance_id: selectedInstanceId,
+          name: newCampaign.name,
+          message: newCampaign.message,
+          contact_ids: [], // Por enquanto vazio
+          status: "draft"
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Campanha criada com sucesso!",
+      });
+
+      handleCampaignCreated();
+      
+      // Atualizar lista de campanhas
+      setCampaigns(prev => [data, ...prev]);
+    } catch (error: any) {
+      toast({
+        title: "Erro ao criar campanha",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteCampaign = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("campaigns")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setCampaigns(prev => prev.filter(c => c.id !== id));
+      toast({
+        title: "Sucesso",
+        description: "Campanha excluída com sucesso!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao excluir campanha",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "active": return "bg-green-100 text-green-800";
+      case "completed": return "bg-blue-100 text-blue-800";
+      case "paused": return "bg-yellow-100 text-yellow-800";
+      case "draft": return "bg-gray-100 text-gray-800";
+      default: return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case "active": return "Ativa";
+      case "completed": return "Concluída";
+      case "paused": return "Pausada";
+      case "draft": return "Rascunho";
+      default: return status;
+    }
+  };
+
+  const onStartCampaign = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("campaigns")
+        .update({ status: "active" })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setCampaigns(prev => 
+        prev.map(c => 
+          c.id === id ? { ...c, status: "active" } : c
+        )
+      );
+
+      toast({
+        title: "Sucesso",
+        description: "Campanha iniciada!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao iniciar campanha",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -42,8 +191,31 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
               <DialogTitle>Criar Nova Campanha</DialogTitle>
             </DialogHeader>
             <CampaignForm 
-              contactGroups={contactGroups}
-              onSuccess={handleCampaignCreated}
+              newCampaign={newCampaign}
+              setNewCampaign={setNewCampaign}
+              contactSource={contactSource}
+              setContactSource={setContactSource}
+              googleConnected={googleConnected}
+              googleSheetName={googleSheetName}
+              handleConnectGoogle={handleConnectGoogle}
+              setGoogleConnected={setGoogleConnected}
+              setGoogleSheetName={setGoogleSheetName}
+              supabaseGroups={contactGroups}
+              googleSheetGroups={[]}
+              selectedGroup={selectedGroup}
+              setSelectedGroup={setSelectedGroup}
+              scheduleType={scheduleType}
+              setScheduleType={setScheduleType}
+              scheduleDate={scheduleDate}
+              setScheduleDate={setScheduleDate}
+              scheduleTime={scheduleTime}
+              setScheduleTime={setScheduleTime}
+              recurringInterval={recurringInterval}
+              setRecurringInterval={setRecurringInterval}
+              createCampaign={createCampaign}
+              instances={instances}
+              selectedInstanceId={selectedInstanceId}
+              setSelectedInstanceId={setSelectedInstanceId}
             />
           </DialogContent>
         </Dialog>
@@ -77,7 +249,13 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         </Alert>
       )}
 
-      <CampaignList />
+      <CampaignList 
+        campaigns={campaigns}
+        deleteCampaign={deleteCampaign}
+        getStatusColor={getStatusColor}
+        getStatusText={getStatusText}
+        onStartCampaign={onStartCampaign}
+      />
     </div>
   );
 };
