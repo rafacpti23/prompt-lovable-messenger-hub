@@ -30,12 +30,17 @@ export function useDashboardStats() {
         return;
       }
 
-      // Mensagens enviadas (messages_log)
+      // Mensagens enviadas (messages_log) - apenas do usuário atual
       let sentMessages = 0;
       const sentMessagesResult = await supabase
         .from("messages_log")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "sent");
+        .select(`
+          id,
+          campaigns!inner(user_id)
+        `, { count: "exact", head: true })
+        .eq("status", "sent")
+        .eq("campaigns.user_id", user.id);
+        
       if (!sentMessagesResult.error && typeof sentMessagesResult.count === "number") {
         sentMessages = sentMessagesResult.count;
       }
@@ -55,7 +60,7 @@ export function useDashboardStats() {
         .from("campaigns")
         .select("*", { count: "exact", head: true })
         .eq("user_id", user.id)
-        .eq("status", "active");
+        .in("status", ["active", "scheduled"]);
       if (!activeCampaignsRes.error && typeof activeCampaignsRes.count === "number") {
         activeCampaigns = activeCampaignsRes.count;
       }

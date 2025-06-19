@@ -45,22 +45,38 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
 
   const { toast } = useToast();
 
-  // Busca e mantém instâncias do Supabase atualizadas em tempo real
+  // Busca e mantém instâncias do Supabase atualizadas em tempo real - APENAS DO USUÁRIO ATUAL
   useEffect(() => {
     let channel: any;
     async function fetchAndSubscribeInstances() {
       setLoadingInstances(true);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setInstances([]);
+        setLoadingInstances(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("instances")
         .select("*")
+        .eq("user_id", user.id) // Filtrar apenas instâncias do usuário atual
         .order("created_at", { ascending: false });
+        
       if (!error && data) setInstances(data);
       setLoadingInstances(false);
+      
       channel = supabase
         .channel('public:instances:campaigns')
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'instances' },
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'instances',
+            filter: `user_id=eq.${user.id}` // Filtrar apenas do usuário atual
+          },
           (payload) => {
             fetchAndSubscribeInstances();
           }
