@@ -16,6 +16,7 @@ import SettingsModal from "@/components/settings/SettingsModal";
 import { supabase } from "@/integrations/supabase/client";
 import WhatsAppLogosBG from "@/components/WhatsAppLogosBG";
 import { ThemeProvider } from "@/components/ui/theme-provider";
+import { usePaymentVerification } from "@/hooks/usePaymentVerification";
 
 const MainApp = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -23,6 +24,9 @@ const MainApp = () => {
   const getDefaultTheme = (): "light" | "dark" =>
     window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   const [theme, setTheme] = useState<"light" | "dark">(getDefaultTheme());
+
+  // Use payment verification hook
+  usePaymentVerification();
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");

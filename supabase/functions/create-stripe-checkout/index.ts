@@ -115,7 +115,7 @@ serve(async (req) => {
     // Para planos pagos, usar links diretos do Stripe
     let stripeUrl = "";
     if (planData.name === "starter") {
-      stripeUrl = "https://buy.stripe.com/dRmeVdfE73AegDU6TG4ow00";
+      stripeUrl = "https://buy.stripe.com/aFa4gz77B8Uy87o0vi4ow01";
     } else if (planData.name === "master") {
       stripeUrl = "https://buy.stripe.com/dRmeVdfE73AegDU6TG4ow00";
     }
