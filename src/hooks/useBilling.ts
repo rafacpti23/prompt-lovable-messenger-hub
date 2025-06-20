@@ -11,11 +11,18 @@ export function useBilling() {
     if (!user) return { error: "Usuário não autenticado" };
 
     try {
+      console.log("Purchasing plan:", planId);
+      
       const { data, error } = await supabase.functions.invoke("create-stripe-checkout", {
         body: { planId }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error calling create-stripe-checkout:", error);
+        throw error;
+      }
+
+      console.log("Response from create-stripe-checkout:", data);
 
       // Se for trial, não precisa redirecionar
       if (data.trial) {
@@ -41,9 +48,16 @@ export function useBilling() {
     if (!user) return;
 
     try {
+      console.log("Verifying payment for user:", user.email);
+      
       const { data, error } = await supabase.functions.invoke("verify-stripe-payment");
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error calling verify-stripe-payment:", error);
+        throw error;
+      }
+      
+      console.log("Response from verify-stripe-payment:", data);
       
       if (data.hasActiveSubscription) {
         await refreshSubscription();

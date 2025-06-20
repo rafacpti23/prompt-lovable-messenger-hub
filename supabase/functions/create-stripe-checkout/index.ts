@@ -14,21 +14,39 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Starting create-stripe-checkout function");
+
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
     );
 
-    const authHeader = req.headers.get("Authorization")!;
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.log("No authorization header");
+      return new Response(JSON.stringify({ error: "Usuário não autenticado" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
+
     const token = authHeader.replace("Bearer ", "");
     const { data } = await supabaseClient.auth.getUser(token);
     const user = data.user;
     
     if (!user?.email) {
-      throw new Error("Usuário não autenticado");
+      console.log("User not found or no email");
+      return new Response(JSON.stringify({ error: "Usuário não autenticado" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
     }
 
+    console.log("User authenticated:", user.email);
+
     const { planId } = await req.json();
+    console.log("Plan ID requested:", planId);
 
     // Buscar dados do plano
     const { data: planData, error: planError } = await supabaseClient
@@ -38,11 +56,19 @@ serve(async (req) => {
       .single();
 
     if (planError || !planData) {
-      throw new Error("Plano não encontrado");
+      console.log("Plan not found:", planError);
+      return new Response(JSON.stringify({ error: "Plano não encontrado" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 404,
+      });
     }
+
+    console.log("Plan found:", planData.name);
 
     // Para plano trial, ativar diretamente
     if (planData.name === "trial") {
+      console.log("Processing trial plan");
+      
       // Cancelar assinatura atual se existir
       const { data: currentSub } = await supabaseClient
         .from("user_subscriptions")
@@ -61,7 +87,7 @@ serve(async (req) => {
       // Criar nova assinatura trial
       const expiresAt = new Date(Date.now() + planData.duration_days * 24 * 60 * 60 * 1000);
       
-      await supabaseClient
+      const { error: insertError } = await supabaseClient
         .from("user_subscriptions")
         .insert({
           user_id: user.id,
@@ -72,63 +98,38 @@ serve(async (req) => {
           status: "active"
         });
 
+      if (insertError) {
+        console.log("Error creating trial subscription:", insertError);
+        return new Response(JSON.stringify({ error: "Erro ao criar assinatura trial" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+        });
+      }
+
       return new Response(JSON.stringify({ success: true, trial: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
     }
 
-    // Para planos pagos, usar Stripe
-    const stripe = new Stripe(Deno.env.get("striper_token") || "", {
-      apiVersion: "2023-10-16",
-    });
-
-    // Verificar se já existe customer
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
-    let customerId;
-    
-    if (customers.data.length > 0) {
-      customerId = customers.data[0].id;
-    } else {
-      const customer = await stripe.customers.create({
-        email: user.email,
-        metadata: {
-          user_id: user.id,
-          plan_id: planId
-        }
-      });
-      customerId = customer.id;
+    // Para planos pagos, usar links diretos do Stripe
+    let stripeUrl = "";
+    if (planData.name === "starter") {
+      stripeUrl = "https://buy.stripe.com/dRmeVdfE73AegDU6TG4ow00";
+    } else if (planData.name === "master") {
+      stripeUrl = "https://buy.stripe.com/dRmeVdfE73AegDU6TG4ow00";
     }
 
-    // Criar sessão de checkout
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      line_items: [
-        {
-          price_data: {
-            currency: "brl",
-            product_data: {
-              name: `Plano ${planData.name === "starter" ? "Starter" : "Master"}`,
-              description: `${planData.credits} mensagens/mês`,
-            },
-            unit_amount: Math.round(planData.price * 100), // Converter para centavos
-            recurring: {
-              interval: "month",
-            },
-          },
-          quantity: 1,
-        },
-      ],
-      mode: "subscription",
-      success_url: `${req.headers.get("origin")}/billing?success=true`,
-      cancel_url: `${req.headers.get("origin")}/billing?canceled=true`,
-      metadata: {
-        user_id: user.id,
-        plan_id: planId,
-      },
-    });
+    if (!stripeUrl) {
+      console.log("No Stripe URL found for plan:", planData.name);
+      return new Response(JSON.stringify({ error: "Link de pagamento não encontrado" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 404,
+      });
+    }
 
-    return new Response(JSON.stringify({ url: session.url }), {
+    console.log("Returning Stripe URL:", stripeUrl);
+    return new Response(JSON.stringify({ url: stripeUrl }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
