@@ -1,11 +1,14 @@
-import React from "react";
+
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus } from "lucide-react";
+import { Plus, Eye, Upload, X } from "lucide-react";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+import MessagePreview from "./MessagePreview";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 interface Instance {
   id: string;
@@ -70,11 +73,53 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
   selectedInstanceId,
   setSelectedInstanceId,
 }) => {
-  // Removido o filtro, mostra todas as instâncias do Supabase
-  // const connectedInstances = instances.filter(
-  //   inst => inst.status === "connected" || inst.status === "open"
-  // );
-  // Usar diretamente o array instances recebido por prop:
+  const [messageType, setMessageType] = useState<"text" | "image" | "video">("text");
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<string>("");
+  const [showPreview, setShowPreview] = useState(false);
+
+  const handleMediaUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setMediaFile(file);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setMediaPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeMedia = () => {
+    setMediaFile(null);
+    setMediaPreview("");
+  };
+
+  const insertVariable = (variable: string) => {
+    const textarea = document.querySelector('textarea[placeholder="Mensagem da campanha"]') as HTMLTextAreaElement;
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const text = textarea.value;
+      const newText = text.substring(0, start) + variable + text.substring(end);
+      setNewCampaign({...newCampaign, message: newText});
+      
+      // Reposicionar cursor
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(start + variable.length, start + variable.length);
+      }, 0);
+    }
+  };
+
+  const isFormValid = () => {
+    return (
+      selectedInstanceId &&
+      newCampaign.name.trim() &&
+      selectedGroup &&
+      (messageType === "text" ? newCampaign.message.trim() : mediaFile)
+    );
+  };
 
   return (
     <Card>
@@ -88,21 +133,22 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
         <div className="space-y-4">
           {/* Instância WhatsApp */}
           <div>
-            <label className="block font-medium mb-2">Instância WhatsApp:</label>
-            <select
-              className="w-80 px-2 py-1 border rounded"
-              value={selectedInstanceId}
-              onChange={e => setSelectedInstanceId(e.target.value)}
-            >
-              {instances.length === 0 && (
-                <option value="">Nenhuma instância cadastrada</option>
-              )}
-              {instances.map((inst) => (
-                <option value={inst.id} key={inst.id}>
-                  {inst.instance_name} {inst.status === "connected" || inst.status === "open" ? "(Conectada)" : "(Desconectada)"}
-                </option>
-              ))}
-            </select>
+            <label className="block font-medium mb-2">Instância WhatsApp: *</label>
+            <Select value={selectedInstanceId} onValueChange={setSelectedInstanceId}>
+              <SelectTrigger className="w-80">
+                <SelectValue placeholder="Selecione uma instância" />
+              </SelectTrigger>
+              <SelectContent>
+                {instances.length === 0 && (
+                  <SelectItem value="" disabled>Nenhuma instância cadastrada</SelectItem>
+                )}
+                {instances.map((inst) => (
+                  <SelectItem value={inst.id} key={inst.id}>
+                    {inst.instance_name} {inst.status === "connected" || inst.status === "open" ? "(Conectada)" : "(Desconectada)"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Fonte de contatos */}
@@ -160,11 +206,8 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
 
           {/* Grupo de contatos */}
           <div>
-            <label className="block font-medium mb-2">Grupo de contatos:</label>
-            <Select
-              value={selectedGroup}
-              onValueChange={setSelectedGroup}
-            >
+            <label className="block font-medium mb-2">Grupo de contatos: *</label>
+            <Select value={selectedGroup} onValueChange={setSelectedGroup}>
               <SelectTrigger className="w-60">
                 <SelectValue placeholder="Selecione grupo" />
               </SelectTrigger>
@@ -178,18 +221,143 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
             </Select>
           </div>
 
-          {/* Nome e mensagem */}
-          <Input
-            placeholder="Nome da campanha"
-            value={newCampaign.name}
-            onChange={(e) => setNewCampaign({...newCampaign, name: e.target.value})}
-          />
-          <Textarea
-            placeholder="Mensagem da campanha"
-            value={newCampaign.message}
-            onChange={(e) => setNewCampaign({...newCampaign, message: e.target.value})}
-            rows={4}
-          />
+          {/* Nome da campanha */}
+          <div>
+            <label className="block font-medium mb-2">Nome da campanha: *</label>
+            <Input
+              placeholder="Nome da campanha"
+              value={newCampaign.name}
+              onChange={(e) => setNewCampaign({...newCampaign, name: e.target.value})}
+            />
+          </div>
+
+          {/* Tipo de mensagem */}
+          <div>
+            <label className="block font-medium mb-2">Tipo de mensagem:</label>
+            <div className="flex gap-2">
+              <Button
+                variant={messageType === "text" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setMessageType("text")}
+                type="button"
+              >
+                Texto
+              </Button>
+              <Button
+                variant={messageType === "image" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setMessageType("image")}
+                type="button"
+              >
+                Imagem
+              </Button>
+              <Button
+                variant={messageType === "video" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setMessageType("video")}
+                type="button"
+              >
+                Vídeo
+              </Button>
+            </div>
+          </div>
+
+          {/* Upload de mídia */}
+          {messageType !== "text" && (
+            <div>
+              <label className="block font-medium mb-2">
+                Upload de {messageType === "image" ? "Imagem" : "Vídeo"}: *
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  accept={messageType === "image" ? "image/*" : "video/*"}
+                  onChange={handleMediaUpload}
+                  className="hidden"
+                  id="media-upload"
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => document.getElementById("media-upload")?.click()}
+                  type="button"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Selecionar {messageType === "image" ? "Imagem" : "Vídeo"}
+                </Button>
+                {mediaFile && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">{mediaFile.name}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={removeMedia}
+                      type="button"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Mensagem/Caption */}
+          <div>
+            <label className="block font-medium mb-2">
+              {messageType === "text" ? "Mensagem da campanha: *" : "Legenda (opcional):"}
+            </label>
+            <div className="space-y-2">
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => insertVariable("{{nome}}")}
+                  type="button"
+                >
+                  Inserir Nome
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => insertVariable("{{telefone}}")}
+                  type="button"
+                >
+                  Inserir Telefone
+                </Button>
+              </div>
+              <Textarea
+                placeholder={messageType === "text" ? "Mensagem da campanha" : "Legenda para a mídia"}
+                value={newCampaign.message}
+                onChange={(e) => setNewCampaign({...newCampaign, message: e.target.value})}
+                rows={4}
+              />
+              <p className="text-sm text-gray-500">
+                Use {{nome}} e {{telefone}} para inserir dados do contato
+              </p>
+            </div>
+          </div>
+
+          {/* Preview da mensagem */}
+          <div>
+            <Dialog open={showPreview} onOpenChange={setShowPreview}>
+              <DialogTrigger asChild>
+                <Button variant="outline" type="button">
+                  <Eye className="h-4 w-4 mr-2" />
+                  Visualizar Mensagem
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Preview da Mensagem</DialogTitle>
+                </DialogHeader>
+                <MessagePreview 
+                  message={newCampaign.message}
+                  messageType={messageType}
+                  mediaPreview={mediaPreview}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
 
           {/* Agendamento */}
           <div>
@@ -243,10 +411,20 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
           </div>
 
           {/* Botão criar campanha */}
-          <Button onClick={createCampaign}>
+          <Button 
+            onClick={createCampaign}
+            disabled={!isFormValid()}
+            className={!isFormValid() ? "opacity-50 cursor-not-allowed" : ""}
+          >
             <Plus className="h-4 w-4 mr-2" />
             Criar Campanha
           </Button>
+          
+          {!isFormValid() && (
+            <p className="text-sm text-red-500">
+              * Campos obrigatórios: Instância, Nome, Grupo, {messageType === "text" ? "Mensagem" : "Arquivo de mídia"}
+            </p>
+          )}
         </div>
       </CardContent>
     </Card>
