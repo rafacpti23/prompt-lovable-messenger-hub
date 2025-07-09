@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Users, Plus, Search, Trash2, Upload } from "lucide-react";
+import { Users, Plus, Search, Trash2, Upload, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import GroupSelector from "./GroupSelector";
 import { supabase } from "@/integrations/supabase/client";
@@ -112,7 +112,7 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <Users className="h-6 w-6 text-green-600" />
-          <h2 className="text-2xl font-bold text-gray-900">Gerenciar Contatos</h2>
+          <h2 className="text-2xl font-bold text-foreground">Gerenciar Contatos</h2>
         </div>
       </div>
       {/* Adicionar Contato */}
@@ -195,24 +195,36 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
               filteredContacts.map((contact) => (
                 <div
                   key={contact.id}
-                  className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+                  className="flex items-center justify-between p-2 border border-border rounded-lg hover:bg-accent/50 transition-colors"
                 >
-                  <div className="flex items-center space-x-4">
-                    <div>
-                      <p className="font-medium">{contact.name}</p>
-                      <p className="text-sm text-gray-500">{contact.phone}</p>
+                  <div className="flex items-center space-x-3 min-w-0 flex-1">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm truncate">{contact.name}</p>
+                        <p className="text-xs text-muted-foreground">{contact.phone}</p>
+                      </div>
+                      {contact.group && contact.group !== "" && (
+                        <Badge variant="outline" className="text-xs px-1 py-0 mt-1">{contact.group}</Badge>
+                      )}
                     </div>
-                    {contact.group && contact.group !== "" && (
-                      <Badge variant="outline">{contact.group}</Badge>
-                    )}
                   </div>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => deleteContact(contact.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-1 ml-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                    >
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deleteContact(contact.id)}
+                      className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
               ))
             )}

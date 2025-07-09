@@ -35,11 +35,20 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
   const [recurringInterval, setRecurringInterval] = useState(1);
   const [selectedInstanceId, setSelectedInstanceId] = useState("");
 
-  // Mock data para desenvolvimento
-  const instances = [
-    { id: "1", instance_name: "Instância Principal", status: "connected" },
-    { id: "2", instance_name: "Instância Secundária", status: "disconnected" }
-  ];
+  // Buscar instâncias reais do usuário
+  const [instances, setInstances] = useState<Array<{id: string, instance_name: string, status: string}>>([]);
+  
+  React.useEffect(() => {
+    const fetchInstances = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from("instances")
+        .select("id, instance_name, status")
+        .eq("user_id", user.id);
+      setInstances(data || []);
+    };
+    fetchInstances();
+  }, [user]);
 
   const handleCampaignCreated = () => {
     setShowCreateForm(false);
@@ -194,7 +203,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
               Nova Campanha
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Criar Nova Campanha</DialogTitle>
             </DialogHeader>

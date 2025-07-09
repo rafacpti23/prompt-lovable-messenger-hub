@@ -130,9 +130,29 @@ export function useManageInstances() {
   const connect = async (instance: Instance) => {
     try {
       const response = await connectInstance(instance.instance_name);
-      if (response?.status) {
-        await updateInstance(instance.id, { status: response.status });
+      console.log("Response from connect:", response);
+      
+      // Determinar novo status baseado no status atual
+      let newStatus = "connecting";
+      if (instance.status === "connected" || instance.status === "open") {
+        newStatus = "disconnecting";
       }
+      
+      await updateInstance(instance.id, { status: newStatus });
+      
+      // Verificar status real após alguns segundos
+      setTimeout(async () => {
+        try {
+          // Aqui você pode implementar uma função para verificar o status real da API
+          // Por enquanto, vamos simular uma atualização baseada na resposta
+          if (response?.status) {
+            await updateInstance(instance.id, { status: response.status });
+          }
+        } catch (error) {
+          console.error("Erro ao verificar status:", error);
+        }
+      }, 3000);
+      
       toast({
         title: "Solicitação de conexão enviada!",
         description: "Aguarde o status atualizar.",

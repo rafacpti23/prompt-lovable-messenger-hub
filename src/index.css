@@ -68,6 +68,18 @@
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', system-ui, sans-serif;
+    background: linear-gradient(135deg, 
+      hsl(var(--background)) 0%, 
+      hsl(var(--secondary)) 50%, 
+      hsl(120 60% 95%) 100%);
+    min-height: 100vh;
+  }
+  
+  .dark body {
+    background: linear-gradient(135deg, 
+      hsl(var(--background)) 0%, 
+      hsl(217 32% 15%) 50%, 
+      hsl(120 20% 10%) 100%);
   }
 }
 
@@ -102,6 +114,19 @@
 
   .animate-float-diagonal {
     animation: float-diagonal 8s ease-in-out infinite;
+  }
+
+  .whatsapp-gradient {
+    background: linear-gradient(135deg, 
+      hsl(120 60% 50%) 0%, 
+      hsl(120 55% 40%) 35%, 
+      hsl(120 50% 30%) 100%);
+  }
+
+  .whatsapp-pattern {
+    background-image: 
+      radial-gradient(circle at 25% 25%, rgba(37, 211, 102, 0.1) 0%, transparent 25%),
+      radial-gradient(circle at 75% 75%, rgba(37, 211, 102, 0.1) 0%, transparent 25%);
   }
 }
 

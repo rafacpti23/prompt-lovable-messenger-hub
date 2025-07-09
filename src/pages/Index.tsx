@@ -118,9 +118,9 @@ const MainApp = () => {
   return (
     <ThemeProvider defaultTheme={theme} forcedTheme={undefined} attribute="class">
       <WhatsAppLogosBG />
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 dark:from-gray-900 dark:to-black flex flex-col">
+      <div className="min-h-screen flex flex-col">
         {/* Header */}
-        <header className="bg-white dark:bg-gray-900 shadow-sm border-b">
+        <header className="bg-card border-b border-border shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
               <div className="flex items-center space-x-4">
@@ -130,14 +130,14 @@ const MainApp = () => {
                     alt="WhatsApp Pro Logo" 
                     className="h-8 w-8"
                   />
-                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white">WhatsApp Pro</h1>
+                  <h1 className="text-2xl font-bold text-foreground">WhatsApp Pro</h1>
                 </div>
               </div>
               <div className="flex items-center space-x-4">
                 <Badge variant="outline" className="text-green-600">
                   Online
                 </Badge>
-                <span className="text-sm text-gray-600 dark:text-gray-200">
+                <span className="text-sm text-muted-foreground">
                   {user.email}
                 </span>
                 <Button
@@ -166,7 +166,7 @@ const MainApp = () => {
         {/* Main Content */}
         <main className="relative flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 z-10">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-5 lg:w-fit lg:grid-cols-5 bg-white dark:bg-gray-800 shadow-sm">
+            <TabsList className="grid w-full grid-cols-5 lg:w-fit lg:grid-cols-5 bg-card shadow-sm">
               <TabsTrigger value="dashboard" className="flex items-center space-x-2">
                 <BarChart3 className="h-4 w-4" />
                 <span className="hidden sm:inline">Dashboard</span>
@@ -218,7 +218,7 @@ const MainApp = () => {
           open={showSettings}
           onOpenChange={setShowSettings}
         />
-        <footer className="text-center py-2 text-xs bg-white/70 dark:bg-gray-900/80 text-gray-500 dark:text-gray-300 w-full border-t z-20 fixed bottom-0 left-0 right-0">
+        <footer className="text-center py-2 text-xs bg-card/70 text-muted-foreground w-full border-t border-border z-20 fixed bottom-0 left-0 right-0">
           © {new Date().getFullYear()} Ramel tecnologia ramelseg.com.br — (27) 99908-2624
         </footer>
       </div>
