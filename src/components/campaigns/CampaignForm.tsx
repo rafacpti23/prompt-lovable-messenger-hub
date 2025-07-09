@@ -332,7 +332,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
                 rows={4}
               />
               <p className="text-sm text-gray-500">
-                Use {{nome}} e {{telefone}} para inserir dados do contato
+                Use {`{{nome}}`} e {`{{telefone}}`} para inserir dados do contato
               </p>
             </div>
           </div>
