@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MessageSquare, Users, Send, BarChart3, Settings, Moon, Sun, CreditCard } from "lucide-react";
 import { useAuth, AuthProvider } from "@/components/auth/AuthProvider";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import LoginForm from "@/components/auth/LoginForm";
 import Dashboard from "@/components/dashboard/Dashboard";
 import InstancesManager from "@/components/instances/InstancesManager";
@@ -43,11 +44,14 @@ const MainApp = () => {
 
   let user, signOut, isLoading, error;
   let contextError = null;
+  let profile = null;
   try {
     const auth = useAuth();
+    const profileData = useUserProfile();
     user = auth.user;
     signOut = auth.signOut;
     isLoading = auth.isLoading;
+    profile = profileData.profile;
     console.log("Auth info", { user, isLoading });
   } catch (e) {
     console.error("Erro no useAuth:", e);
@@ -138,7 +142,7 @@ const MainApp = () => {
                   Online
                 </Badge>
                 <span className="text-sm text-muted-foreground">
-                  {user.email}
+                  {profile?.full_name || user.email}
                 </span>
                 <Button
                   variant="outline"

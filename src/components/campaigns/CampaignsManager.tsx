@@ -140,9 +140,10 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "active": return "bg-green-100 text-green-800";
-      case "completed": return "bg-blue-100 text-blue-800";
-      case "paused": return "bg-yellow-100 text-yellow-800";
+      case "sending": return "bg-blue-100 text-blue-800";
+      case "sent": return "bg-green-100 text-green-800";
+      case "scheduled": return "bg-yellow-100 text-yellow-800";
+      case "failed": return "bg-red-100 text-red-800";
       case "draft": return "bg-gray-100 text-gray-800";
       default: return "bg-gray-100 text-gray-800";
     }
@@ -150,9 +151,10 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case "active": return "Ativa";
-      case "completed": return "Concluída";
-      case "paused": return "Pausada";
+      case "sending": return "Enviando";
+      case "sent": return "Enviada";
+      case "scheduled": return "Agendada";
+      case "failed": return "Falhou";
       case "draft": return "Rascunho";
       default: return status;
     }
@@ -162,14 +164,14 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     try {
       const { error } = await supabase
         .from("campaigns")
-        .update({ status: "active" })
+        .update({ status: "sending" })
         .eq("id", id);
 
       if (error) throw error;
 
       setCampaigns(prev => 
         prev.map(c => 
-          c.id === id ? { ...c, status: "active" } : c
+          c.id === id ? { ...c, status: "sending" } : c
         )
       );
 
