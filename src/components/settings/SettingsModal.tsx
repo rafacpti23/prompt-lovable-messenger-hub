@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Save, Key, Server, Clock, Users, CreditCard } from "lucide-react";
+import { Save, Key, Server, Clock, Users, CreditCard, Brain } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/auth/AuthProvider";
 import UserManagement from "./UserManagement";
@@ -23,6 +23,8 @@ const SettingsModal = ({ open, onOpenChange }: SettingsModalProps) => {
   const [apiUrl, setApiUrl] = useState(localStorage.getItem('evolution_api_url') || '');
   const [apiKey, setApiKey] = useState(localStorage.getItem('evolution_api_key') || '');
   const [messageInterval, setMessageInterval] = useState(localStorage.getItem('message_interval') || '5');
+  const [groqApiKey, setGroqApiKey] = useState(localStorage.getItem('groq_api_key') || '');
+  const [geminiApiKey, setGeminiApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
   const [loading, setSaving] = useState(false);
 
   // Verifica se é o usuário administrador
@@ -47,6 +49,14 @@ const SettingsModal = ({ open, onOpenChange }: SettingsModalProps) => {
       if (apiUrl && apiKey) {
         localStorage.setItem('evolution_api_url', apiUrl);
         localStorage.setItem('evolution_api_key', apiKey);
+      }
+      
+      // Salvar configurações da IA
+      if (groqApiKey) {
+        localStorage.setItem('groq_api_key', groqApiKey);
+      }
+      if (geminiApiKey) {
+        localStorage.setItem('gemini_api_key', geminiApiKey);
       }
       
       toast({
@@ -111,6 +121,14 @@ const SettingsModal = ({ open, onOpenChange }: SettingsModalProps) => {
               >
                 <CreditCard className="h-4 w-4 mr-2" />
                 Planos
+              </Button>
+              <Button
+                variant={activeTab === "ai" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setActiveTab("ai")}
+              >
+                <Brain className="h-4 w-4 mr-2" />
+                IA
               </Button>
             </>
           )}
@@ -223,6 +241,70 @@ const SettingsModal = ({ open, onOpenChange }: SettingsModalProps) => {
           {/* Gerenciamento de Planos - Só Admin */}
           {activeTab === "plans" && isAdmin && (
             <PlanManagement />
+          )}
+
+          {/* Configurações de IA */}
+          {activeTab === "ai" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Brain className="h-5 w-5" />
+                  Inteligência Artificial
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="bg-blue-50 dark:bg-blue-950/50 p-3 rounded-lg mb-4">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    Configure as APIs de IA para geração automática de mensagens personalizadas, 
+                    análise de sentimento e otimização de campanhas.
+                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="groq-api-key" className="flex items-center gap-2">
+                    <Key className="h-4 w-4" />
+                    API Key Groq
+                  </Label>
+                  <Input
+                    id="groq-api-key"
+                    type="password"
+                    placeholder="Sua chave da API Groq"
+                    value={groqApiKey}
+                    onChange={(e) => setGroqApiKey(e.target.value)}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    API rápida e eficiente para geração de mensagens personalizadas
+                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="gemini-api-key" className="flex items-center gap-2">
+                    <Key className="h-4 w-4" />
+                    API Key Google Gemini
+                  </Label>
+                  <Input
+                    id="gemini-api-key"
+                    type="password"
+                    placeholder="Sua chave da API Gemini"
+                    value={geminiApiKey}
+                    onChange={(e) => setGeminiApiKey(e.target.value)}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    API avançada do Google para análise de sentimento e conteúdo
+                  </p>
+                </div>
+                
+                <div className="flex justify-end gap-3">
+                  <Button variant="outline" onClick={() => onOpenChange(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleSave} disabled={loading}>
+                    <Save className="h-4 w-4 mr-2" />
+                    {loading ? "Salvando..." : "Salvar"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           )}
         </div>
       </DialogContent>

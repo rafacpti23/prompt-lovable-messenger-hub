@@ -7,7 +7,7 @@ import PlanSelector from "./PlanSelector";
 import TransactionHistory from "./TransactionHistory";
 
 const BillingManager: React.FC = () => {
-  const [activeTab, setActiveTab] = useState("credits");
+  const [activeTab, setActiveTab] = useState("plans");
 
   return (
     <div className="space-y-6">
