@@ -1,0 +1,156 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Professional Windows-style theme - Clean blues and greys */
+    --background: 255 255 255;
+    --foreground: 51 51 51;
+    --card: 255 255 255;
+    --card-foreground: 51 51 51;
+    --popover: 255 255 255;
+    --popover-foreground: 51 51 51;
+    --primary: 0 120 215;
+    --primary-foreground: 255 255 255;
+    --secondary: 248 250 252;
+    --secondary-foreground: 71 85 105;
+    --muted: 248 250 252;
+    --muted-foreground: 100 116 139;
+    --accent: 240 249 255;
+    --accent-foreground: 14 116 144;
+    --destructive: 239 68 68;
+    --destructive-foreground: 255 255 255;
+    --border: 226 232 240;
+    --input: 255 255 255;
+    --ring: 0 120 215;
+    --chart-1: 0 120 215;
+    --chart-2: 34 197 94;
+    --chart-3: 147 51 234;
+    --chart-4: 239 68 68;
+    --chart-5: 6 182 212;
+    --radius: 0.5rem;
+    
+    /* Professional gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(205 100% 42%) 0%, hsl(205 89% 48%) 100%);
+    --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)) 0%, hsl(var(--accent)) 100%);
+    --gradient-bg: linear-gradient(135deg, hsl(var(--background)) 0%, hsl(210 20% 96%) 50%, hsl(210 30% 92%) 100%);
+    --gradient-card: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(210 15% 98%) 100%);
+  }
+
+  .dark {
+    /* Professional dark theme - Windows style */
+    --background: 15 23 42;
+    --foreground: 248 250 252;
+    --card: 30 41 59;
+    --card-foreground: 248 250 252;
+    --popover: 30 41 59;
+    --popover-foreground: 248 250 252;
+    --primary: 59 130 246;
+    --primary-foreground: 255 255 255;
+    --secondary: 51 65 85;
+    --secondary-foreground: 203 213 225;
+    --muted: 51 65 85;
+    --muted-foreground: 148 163 184;
+    --accent: 30 58 138;
+    --accent-foreground: 241 245 249;
+    --destructive: 239 68 68;
+    --destructive-foreground: 255 255 255;
+    --border: 71 85 105;
+    --input: 30 41 59;
+    --ring: 59 130 246;
+    --chart-1: 59 130 246;
+    --chart-2: 34 197 94;
+    --chart-3: 168 85 247;
+    --chart-4: 239 68 68;
+    --chart-5: 6 182 212;
+    
+    /* Dark theme gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(213 93% 68%) 0%, hsl(213 89% 74%) 100%);
+    --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)) 0%, hsl(var(--accent)) 100%);
+    --gradient-bg: linear-gradient(135deg, hsl(var(--background)) 0%, hsl(210 10% 23%) 50%, hsl(210 15% 20%) 100%);
+    --gradient-card: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(210 10% 28%) 100%);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--gradient-bg);
+    min-height: 100vh;
+  }
+}
+
+@layer utilities {
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-20px);
+    }
+  }
+
+  @keyframes float-diagonal {
+    0%, 100% {
+      transform: translateY(0px) translateX(0px);
+    }
+    25% {
+      transform: translateY(-15px) translateX(10px);
+    }
+    50% {
+      transform: translateY(-10px) translateX(-5px);
+    }
+    75% {
+      transform: translateY(-20px) translateX(8px);
+    }
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-float-diagonal {
+    animation: float-diagonal 8s ease-in-out infinite;
+  }
+
+  .whatsapp-gradient {
+    background: linear-gradient(135deg, 
+      hsl(120 60% 50%) 0%, 
+      hsl(120 55% 40%) 35%, 
+      hsl(120 50% 30%) 100%);
+  }
+
+  .whatsapp-pattern {
+    background-image: 
+      radial-gradient(circle at 25% 25%, rgba(37, 211, 102, 0.1) 0%, transparent 25%),
+      radial-gradient(circle at 75% 75%, rgba(37, 211, 102, 0.1) 0%, transparent 25%);
+  }
+}
+
+.lovable-edit-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.lovable-edit-modal > div {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  max-width: 500px;
+  width: 90%;
+}
