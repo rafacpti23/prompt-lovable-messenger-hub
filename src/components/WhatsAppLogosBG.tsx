@@ -1,22 +1,23 @@
 import React from "react";
 
-// URLs de imagens stock, você pode trocar por SVG real depois
+const logoUrl = "/lovable-uploads/c9bbdaa6-c367-4489-8438-ef65ccaf62f2.png";
+
 const logos = [
   {
-    url: "/lovable.svg",
-    alt: "WhatsApp logo 1",
+    url: logoUrl,
+    alt: "WhatsApp Pro logo background 1",
     style: "left-10 top-72 w-60 opacity-10 blur-sm",
     rotate: "-rotate-6",
   },
   {
-    url: "/lovable.svg",
-    alt: "WhatsApp logo 2",
+    url: logoUrl,
+    alt: "WhatsApp Pro logo background 2",
     style: "right-20 top-24 w-36 opacity-5 blur-md",
     rotate: "rotate-12 scale-x-[-1]",
   },
   {
-    url: "/lovable.svg",
-    alt: "WhatsApp logo 3",
+    url: logoUrl,
+    alt: "WhatsApp Pro logo background 3",
     style: "left-1/2 bottom-32 w-80 opacity-10 blur-sm",
     rotate: "rotate-2 -translate-x-1/2",
   },
