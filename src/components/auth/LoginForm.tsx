@@ -139,7 +139,7 @@ const LoginForm = () => {
           </div>
 
           {/* Right Side: Login Form */}
-          <div className="flex items-center justify-center w-full max-w-md mx-auto mt-12 lg:mt-0">
+          <div id="register-card" className="flex items-center justify-center w-full max-w-md mx-auto mt-12 lg:mt-0">
             <Card className="w-full bg-white/10 backdrop-blur-md shadow-2xl border border-white/20">
               <CardHeader>
                 <CardTitle className="text-center text-2xl text-white">
@@ -302,7 +302,7 @@ const LoginForm = () => {
         </div>
         
         <div className="py-16 px-8">
-          <PlanSelector />
+          <PlanSelector showTrial={true} />
         </div>
       </div>
     </div>
