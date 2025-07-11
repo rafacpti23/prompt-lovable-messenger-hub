@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, Users, Send, BarChart3, Settings, Moon, Sun, CreditCard } from "lucide-react";
+import { MessageSquare, Users, Send, BarChart3, Settings, Moon, Sun, CreditCard, Image } from "lucide-react";
 import { useAuth, AuthProvider } from "@/components/auth/AuthProvider";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import LoginForm from "@/components/auth/LoginForm";
@@ -13,6 +13,7 @@ import InstancesManager from "@/components/instances/InstancesManager";
 import ContactsManager from "@/components/contacts/ContactsManager";
 import CampaignsManager from "@/components/campaigns/CampaignsManager";
 import BillingManager from "@/components/billing/BillingManager";
+import MediaRepository from "@/components/media/MediaRepository";
 import SettingsModal from "@/components/settings/SettingsModal";
 import { supabase } from "@/integrations/supabase/client";
 import WhatsAppLogosBG from "@/components/WhatsAppLogosBG";
@@ -160,7 +161,7 @@ const MainApp = () => {
                   Sair
                 </Button>
                 <Button variant="ghost" size="icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
-                  {theme === "dark" ? <Sun className="h-5 w-5 text-yellow-400" /> : <Moon className="h-5 w-5 text-zinc-900" />}
+                  {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                 </Button>
               </div>
             </div>
@@ -170,7 +171,7 @@ const MainApp = () => {
         {/* Main Content */}
         <main className="relative flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 z-10">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-5 lg:w-fit lg:grid-cols-5 bg-card shadow-sm">
+            <TabsList className="grid w-full grid-cols-6 lg:w-fit lg:grid-cols-6 bg-card shadow-sm">
               <TabsTrigger value="dashboard" className="flex items-center space-x-2">
                 <BarChart3 className="h-4 w-4" />
                 <span className="hidden sm:inline">Dashboard</span>
@@ -186,6 +187,10 @@ const MainApp = () => {
               <TabsTrigger value="campaigns" className="flex items-center space-x-2">
                 <Send className="h-4 w-4" />
                 <span className="hidden sm:inline">Campanhas</span>
+              </TabsTrigger>
+              <TabsTrigger value="media" className="flex items-center space-x-2">
+                <Image className="h-4 w-4" />
+                <span className="hidden sm:inline">Mídia</span>
               </TabsTrigger>
               <TabsTrigger value="billing" className="flex items-center space-x-2">
                 <CreditCard className="h-4 w-4" />
@@ -213,6 +218,9 @@ const MainApp = () => {
                 contactGroups={groups}
               />
             </TabsContent>
+            <TabsContent value="media" className="min-h-[600px]">
+              <MediaRepository />
+            </TabsContent>
             <TabsContent value="billing" className="min-h-[600px]">
               <BillingManager />
             </TabsContent>
@@ -221,6 +229,8 @@ const MainApp = () => {
         <SettingsModal
           open={showSettings}
           onOpenChange={setShowSettings}
+          theme={theme}
+          setTheme={setTheme}
         />
         <footer className="text-center py-2 text-xs bg-card/70 text-muted-foreground w-full border-t border-border z-20 fixed bottom-0 left-0 right-0">
           © {new Date().getFullYear()} Ramel tecnologia ramelseg.com.br — (27) 99908-2624

@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Save, Key, Server, Clock, Users, CreditCard, Brain } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Save, Key, Server, Clock, Users, CreditCard, Brain, Palette } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/auth/AuthProvider";
 import UserManagement from "./UserManagement";
@@ -14,9 +15,11 @@ import PlanManagement from "./PlanManagement";
 interface SettingsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  theme?: "light" | "dark";
+  setTheme?: React.Dispatch<React.SetStateAction<"light" | "dark">>;
 }
 
-const SettingsModal = ({ open, onOpenChange }: SettingsModalProps) => {
+const SettingsModal = ({ open, onOpenChange, theme, setTheme }: SettingsModalProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("general");
@@ -159,6 +162,27 @@ const SettingsModal = ({ open, onOpenChange }: SettingsModalProps) => {
                     Tempo de espera entre o envio de cada mensagem (padrão: 5 segundos)
                   </p>
                 </div>
+
+                {setTheme && (
+                  <div className="space-y-2">
+                    <Label htmlFor="theme-select" className="flex items-center gap-2">
+                      <Palette className="h-4 w-4" />
+                      Tema do Sistema
+                    </Label>
+                    <Select value={theme} onValueChange={(value) => setTheme?.(value as "light" | "dark")}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o tema" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="light">Claro</SelectItem>
+                        <SelectItem value="dark">Escuro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-sm text-muted-foreground">
+                      Escolha entre o tema claro ou escuro do sistema
+                    </p>
+                  </div>
+                )}
                 
                 <div className="flex justify-end gap-3">
                   <Button variant="outline" onClick={() => onOpenChange(false)}>

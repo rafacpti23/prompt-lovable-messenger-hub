@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Users, Plus, Search, Trash2, Upload, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import GroupSelector from "./GroupSelector";
+import EditContactModal from "./EditContactModal";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Contact {
@@ -29,9 +29,12 @@ interface ContactsManagerProps {
   loading?: boolean;
   user?: any;
 }
+
 const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts, groups, loading, user }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [newContact, setNewContact] = useState({ name: "", phone: "", group: "" });
+  const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
   const { toast } = useToast();
 
   const filteredContacts = contacts.filter(contact =>
@@ -67,7 +70,7 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
       });
       return;
     }
-    if (!user) {
+    if (!user?.id) {
       toast({ title: "Erro", description: "Não autenticado", variant: "destructive" });
       return;
     }
@@ -105,6 +108,17 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
       title: "Contato removido",
       description: "Contato deletado com sucesso",
     });
+  };
+
+  const openEditModal = (contact: Contact) => {
+    setEditingContact(contact);
+    setShowEditModal(true);
+  };
+
+  const handleContactUpdated = (updatedContact: Contact) => {
+    setContacts(contacts.map(contact => 
+      contact.id === updatedContact.id ? updatedContact : contact
+    ));
   };
 
   return (
@@ -212,6 +226,7 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
                     <Button
                       variant="ghost"
                       size="sm"
+                      onClick={() => openEditModal(contact)}
                       className="h-7 w-7 p-0"
                     >
                       <Edit className="h-3 w-3" />
@@ -232,6 +247,14 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
           )}
         </CardContent>
       </Card>
+
+      <EditContactModal
+        contact={editingContact}
+        open={showEditModal}
+        onOpenChange={setShowEditModal}
+        onContactUpdated={handleContactUpdated}
+        groups={groups}
+      />
     </div>
   );
 };

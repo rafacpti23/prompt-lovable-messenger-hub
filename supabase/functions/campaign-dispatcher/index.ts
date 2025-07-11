@@ -35,14 +35,18 @@ serve(async (req) => {
     }
 
     // Verificar se usuário tem créditos suficientes
-    const { data: subscription } = await supabaseClient
+    const { data: subscription, error: subError } = await supabaseClient
       .from('user_subscriptions')
       .select('credits_remaining, status, expires_at')
-      .eq('user_id', campaign.instance.user_id)
+      .eq('user_id', campaign.user_id)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)
-      .single()
+      .maybeSingle()
+
+    if (subError) {
+      console.error('Error fetching subscription:', subError)
+    }
 
     if (!subscription) {
       throw new Error('Nenhuma assinatura ativa encontrada para o usuário')
@@ -98,19 +102,30 @@ serve(async (req) => {
         const { data: currentSubscription } = await supabaseClient
           .from('user_subscriptions')
           .select('credits_remaining')
-          .eq('user_id', campaign.instance.user_id)
+          .eq('user_id', campaign.user_id)
           .eq('status', 'active')
           .order('created_at', { ascending: false })
           .limit(1)
-          .single()
+          .maybeSingle()
 
         if (!currentSubscription || currentSubscription.credits_remaining <= 0) {
           console.log('Créditos esgotados durante o envio')
           break
         }
 
+        // Buscar dados da instância
+        const { data: instance } = await supabaseClient
+          .from('instances')
+          .select('instance_name')
+          .eq('id', campaign.instance_id)
+          .single()
+
+        if (!instance) {
+          throw new Error('Instância não encontrada')
+        }
+
         // Usar o nome da instância na URL
-        const url = `${evolutionApiUrl}/message/sendText/${campaign.instance.instance_name}`
+        const url = `${evolutionApiUrl}/message/sendText/${instance.instance_name}`
         
         const response = await fetch(url, {
           method: 'POST',
@@ -129,7 +144,7 @@ serve(async (req) => {
         if (response.ok) {
           // Decrementar crédito do usuário
           const { error: creditError } = await supabaseClient
-            .rpc('decrement_user_credits', { user_id_param: campaign.instance.user_id })
+            .rpc('decrement_user_credits', { user_id_param: campaign.user_id })
 
           if (creditError) {
             console.error('Erro ao decrementar créditos:', creditError)

@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Eye, Upload, X } from "lucide-react";
+import { Plus, Eye, Upload, X, Image } from "lucide-react";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import MessagePreview from "./MessagePreview";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import MediaRepository from "@/components/media/MediaRepository";
 
 interface Instance {
   id: string;
@@ -76,7 +77,9 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
   const [messageType, setMessageType] = useState<"text" | "image" | "video">("text");
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string>("");
+  const [mediaUrl, setMediaUrl] = useState<string>("");
   const [showPreview, setShowPreview] = useState(false);
+  const [showMediaRepository, setShowMediaRepository] = useState(false);
 
   const handleMediaUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -93,6 +96,13 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
   const removeMedia = () => {
     setMediaFile(null);
     setMediaPreview("");
+    setMediaUrl("");
+  };
+
+  const handleSelectFromRepository = (media: any) => {
+    setMediaUrl(media.file_url);
+    setMediaPreview(media.file_url);
+    setShowMediaRepository(false);
   };
 
   const insertVariable = (variable: string) => {
@@ -117,7 +127,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
       selectedInstanceId &&
       newCampaign.name.trim() &&
       selectedGroup &&
-      (messageType === "text" ? newCampaign.message.trim() : mediaFile)
+      (messageType === "text" ? newCampaign.message.trim() : (mediaFile || mediaUrl))
     );
   };
 
@@ -268,25 +278,37 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
               <label className="block font-medium mb-2">
                 Upload de {messageType === "image" ? "Imagem" : "Vídeo"}: *
               </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="file"
-                  accept={messageType === "image" ? "image/*" : "video/*"}
-                  onChange={handleMediaUpload}
-                  className="hidden"
-                  id="media-upload"
-                />
-                <Button
-                  variant="outline"
-                  onClick={() => document.getElementById("media-upload")?.click()}
-                  type="button"
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Selecionar {messageType === "image" ? "Imagem" : "Vídeo"}
-                </Button>
-                {mediaFile && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">{mediaFile.name}</span>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    accept={messageType === "image" ? "image/*" : "video/*"}
+                    onChange={handleMediaUpload}
+                    className="hidden"
+                    id="media-upload"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => document.getElementById("media-upload")?.click()}
+                    type="button"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload {messageType === "image" ? "Imagem" : "Vídeo"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowMediaRepository(true)}
+                    type="button"
+                  >
+                    <Image className="h-4 w-4 mr-2" />
+                    Repositório
+                  </Button>
+                </div>
+                {(mediaFile || mediaUrl) && (
+                  <div className="flex items-center gap-2 p-2 bg-muted rounded">
+                    <span className="text-sm">
+                      {mediaFile ? mediaFile.name : "Mídia do repositório"}
+                    </span>
                     <Button
                       variant="outline"
                       size="sm"
@@ -426,6 +448,19 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
             </p>
           )}
         </div>
+
+        {/* Modal do Repositório de Mídia */}
+        <Dialog open={showMediaRepository} onOpenChange={setShowMediaRepository}>
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Repositório de Mídia</DialogTitle>
+            </DialogHeader>
+            <MediaRepository
+              onSelectMedia={handleSelectFromRepository}
+              selectionMode={true}
+            />
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );

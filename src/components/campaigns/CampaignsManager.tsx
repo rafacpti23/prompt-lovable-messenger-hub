@@ -162,24 +162,32 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
 
   const onStartCampaign = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from("campaigns")
-        .update({ status: "sending" })
-        .eq("id", id);
+      // Chamar a edge function para processar a campanha
+      const { data, error } = await supabase.functions.invoke('campaign-dispatcher', {
+        body: { campaignId: id }
+      });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error calling campaign-dispatcher:', error);
+        throw new Error(error.message || 'Erro ao processar campanha');
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.error || 'Erro desconhecido ao processar campanha');
+      }
 
       setCampaigns(prev => 
         prev.map(c => 
-          c.id === id ? { ...c, status: "sending" } : c
+          c.id === id ? { ...c, status: "sent" } : c
         )
       );
 
       toast({
         title: "Sucesso",
-        description: "Campanha iniciada!",
+        description: `Campanha processada! ${data.successCount} mensagens enviadas.`,
       });
     } catch (error: any) {
+      console.error('Error starting campaign:', error);
       toast({
         title: "Erro ao iniciar campanha",
         description: error.message,
