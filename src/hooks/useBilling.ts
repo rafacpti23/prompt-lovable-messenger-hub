@@ -1,4 +1,3 @@
-
 import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserSubscription } from "./useUserSubscription";
@@ -26,7 +25,7 @@ export function useBilling() {
 
       // Se for trial, não precisa redirecionar
       if (data.trial) {
-        await refreshSubscription();
+        refreshSubscription();
         return { success: true };
       }
 
@@ -60,7 +59,7 @@ export function useBilling() {
       console.log("Response from verify-stripe-payment:", data);
       
       if (data.hasActiveSubscription) {
-        await refreshSubscription();
+        refreshSubscription();
       }
       
       return data;
