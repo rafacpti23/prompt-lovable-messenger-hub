@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -178,11 +177,11 @@ const PlanSelector: React.FC = () => {
         {planDetails.map((plan) => (
           <Card 
             key={plan.id}
-            className={`relative ${plan.popular ? "ring-2 ring-blue-500" : ""}`}
+            className={`relative ${plan.popular ? "ring-2 ring-primary" : ""}`}
           >
             {plan.popular && (
               <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                <Badge className="bg-blue-600 text-white px-3 py-1">
+                <Badge className="bg-primary text-primary-foreground px-3 py-1">
                   <Star className="h-3 w-3 mr-1" />
                   Mais Popular
                 </Badge>
@@ -196,7 +195,7 @@ const PlanSelector: React.FC = () => {
                  plan.name === "master" ? "Plano Master" : plan.name}
               </CardTitle>
               <div className="mt-4">
-                <span className="text-3xl font-bold text-green-600">
+                <span className="text-3xl font-bold text-primary">
                   R$ {plan.price.toFixed(2).replace('.', ',')}
                 </span>
                 <span className="text-gray-500">
@@ -204,7 +203,7 @@ const PlanSelector: React.FC = () => {
                 </span>
               </div>
               <p className="text-sm text-gray-600 dark:text-gray-300">{plan.description}</p>
-              <div className="text-sm text-blue-600 font-medium">
+              <div className="text-sm text-primary font-medium">
                 {plan.name === "trial" ? "Grátis" : `${plan.pricePerMessage} por mensagem`}
               </div>
             </CardHeader>
@@ -229,7 +228,7 @@ const PlanSelector: React.FC = () => {
                     <ul className="space-y-1">
                       {plan.benefits.map((benefit, index) => (
                         <li key={index} className="text-xs text-gray-600 flex items-center">
-                          <div className="w-1 h-1 bg-blue-500 rounded-full mr-2"></div>
+                          <div className="w-1 h-1 bg-primary rounded-full mr-2"></div>
                           {benefit}
                         </li>
                       ))}
@@ -263,11 +262,11 @@ const PlanSelector: React.FC = () => {
       </div>
 
       {/* Informações sobre Evolution API */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-yellow-800 mb-2">
+      <div className="bg-accent border border-border rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-accent-foreground mb-2">
           💡 Sobre a Evolution API
         </h3>
-        <p className="text-yellow-700 text-sm">
+        <p className="text-muted-foreground text-sm">
           Utilizamos a Evolution API para conectar com o WhatsApp. Você pode usar nossa API integrada 
           ou configurar sua própria instância da Evolution API nas configurações do sistema.
         </p>

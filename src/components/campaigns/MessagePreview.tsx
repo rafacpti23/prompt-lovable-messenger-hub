@@ -1,4 +1,3 @@
-
 import React from "react";
 
 interface MessagePreviewProps {
@@ -24,16 +23,10 @@ const MessagePreview: React.FC<MessagePreviewProps> = ({
   return (
     <div className="max-w-sm mx-auto">
       {/* WhatsApp-like background */}
-      <div 
-        className="min-h-96 p-4"
-        style={{
-          background: "linear-gradient(to bottom, #dddbd1, #d2dbdc)",
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
-        }}
-      >
+      <div className="min-h-96 p-4 whatsapp-bg rounded-lg">
         {/* Message bubble */}
         <div className="flex justify-end mb-4">
-          <div className="bg-green-500 text-white p-3 rounded-lg max-w-xs shadow-md">
+          <div className="bg-[#dcf8c6] dark:bg-[#056162] text-black dark:text-white p-2 rounded-lg max-w-xs shadow-md" style={{ borderTopRightRadius: '0' }}>
             {messageType !== "text" && mediaPreview && (
               <div className="mb-2">
                 {messageType === "image" ? (
@@ -56,7 +49,7 @@ const MessagePreview: React.FC<MessagePreviewProps> = ({
                 {processedMessage}
               </div>
             )}
-            <div className="text-xs text-green-100 mt-1 text-right">
+            <div className="text-xs text-gray-500 dark:text-gray-300 mt-1 text-right">
               12:34 ✓✓
             </div>
           </div>

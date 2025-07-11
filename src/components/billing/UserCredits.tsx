@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,8 +30,8 @@ const UserCredits: React.FC = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-sm text-red-800">
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+              <p className="text-sm text-destructive-foreground">
                 ❌ Nenhuma assinatura ativa encontrada
               </p>
             </div>
@@ -70,7 +69,7 @@ const UserCredits: React.FC = () => {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <MessageSquare className="h-4 w-4 text-green-600" />
+              <MessageSquare className="h-4 w-4 text-primary" />
               <span className="text-2xl font-bold">{subscription.credits_remaining}</span>
               <span className="text-sm text-gray-500">de {subscription.total_credits}</span>
             </div>
@@ -95,10 +94,10 @@ const UserCredits: React.FC = () => {
           )}
           
           {isExpired && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
               <div className="flex items-center">
-                <AlertTriangle className="h-4 w-4 text-red-600 mr-2" />
-                <p className="text-sm text-red-800">
+                <AlertTriangle className="h-4 w-4 text-destructive mr-2" />
+                <p className="text-sm text-destructive-foreground">
                   Plano expirado! Renove para continuar enviando mensagens.
                 </p>
               </div>
@@ -106,10 +105,10 @@ const UserCredits: React.FC = () => {
           )}
           
           {isLowCredits && !isExpired && (
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+            <div className="bg-warning/10 border border-warning/20 rounded-lg p-3">
               <div className="flex items-center">
-                <AlertTriangle className="h-4 w-4 text-orange-600 mr-2" />
-                <p className="text-sm text-orange-800">
+                <AlertTriangle className="h-4 w-4 text-warning mr-2" />
+                <p className="text-sm text-warning-foreground">
                   Poucos créditos restantes! Considere renovar seu plano.
                 </p>
               </div>

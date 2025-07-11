@@ -1,7 +1,6 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, AlertTriangle } from "lucide-react";
+import { Plus, AlertTriangle, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import CampaignForm from "./CampaignForm";
 import CampaignList from "./CampaignList";
@@ -11,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { toast as sonner } from "sonner";
 
 interface CampaignsManagerProps {
   contactGroups: string[];
@@ -18,6 +18,7 @@ interface CampaignsManagerProps {
 
 const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) => {
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [startingCampaign, setStartingCampaign] = useState<string | null>(null);
   const { canSendMessage, subscription } = useBilling();
   const { toast } = useToast();
   const { campaigns, setCampaigns } = useCampaignList(toast);
@@ -55,6 +56,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     // Resetar formulário
     setNewCampaign({ name: "", message: "" });
     setSelectedGroup("");
+    setSelectedInstanceId("");
   };
 
   const handleConnectGoogle = () => {
@@ -64,10 +66,10 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
   };
 
   const createCampaign = async () => {
-    if (!user || !newCampaign.name || !newCampaign.message || !selectedInstanceId) {
+    if (!user || !newCampaign.name || !selectedInstanceId || !selectedGroup) {
       toast({
         title: "Erro",
-        description: "Preencha todos os campos obrigatórios",
+        description: "Preencha todos os campos obrigatórios (Instância, Nome, Grupo)",
         variant: "destructive",
       });
       return;
@@ -81,7 +83,8 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
           instance_id: selectedInstanceId,
           name: newCampaign.name,
           message: newCampaign.message,
-          contact_ids: [], // Por enquanto vazio
+          contact_group: selectedGroup,
+          contact_ids: [],
           status: "draft"
         })
         .select()
@@ -96,7 +99,6 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
 
       handleCampaignCreated();
       
-      // Atualizar lista de campanhas com os campos sent e total
       setCampaigns(prev => [{
         id: data.id,
         name: data.name,
@@ -160,39 +162,66 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     }
   };
 
-  const onStartCampaign = async (id: string) => {
+  const onStartCampaign = async (campaignId: string) => {
+    if (!user) return;
+    setStartingCampaign(campaignId);
+
     try {
-      // Chamar a edge function para processar a campanha
-      const { data, error } = await supabase.functions.invoke('campaign-dispatcher', {
-        body: { campaignId: id }
+      // 1. Buscar a campanha para obter o grupo de contatos
+      const { data: campaign, error: campaignError } = await supabase
+        .from('campaigns')
+        .select('contact_group')
+        .eq('id', campaignId)
+        .single();
+
+      if (campaignError || !campaign) throw new Error("Campanha não encontrada.");
+      if (!campaign.contact_group) throw new Error("Grupo de contatos não definido para esta campanha.");
+
+      // 2. Buscar os contatos do grupo
+      const { data: contacts, error: contactsError } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('user_id', user.id)
+        .contains('tags', [campaign.contact_group]);
+
+      if (contactsError) throw new Error("Erro ao buscar contatos.");
+      if (!contacts || contacts.length === 0) {
+        throw new Error(`Nenhum contato encontrado no grupo "${campaign.contact_group}".`);
+      }
+
+      const contactIds = contacts.map(c => c.id);
+
+      // 3. Atualizar a campanha com os IDs dos contatos e status "scheduled"
+      const { error: updateError } = await supabase
+        .from('campaigns')
+        .update({ contact_ids: contactIds, status: 'scheduled' })
+        .eq('id', campaignId);
+
+      if (updateError) throw new Error("Erro ao preparar campanha para envio.");
+
+      // 4. Chamar a edge function para disparar
+      sonner.info("Iniciando envio da campanha...");
+      const { data: functionData, error: functionError } = await supabase.functions.invoke('campaign-dispatcher', {
+        body: { campaignId: campaignId }
       });
 
-      if (error) {
-        console.error('Error calling campaign-dispatcher:', error);
-        throw new Error(error.message || 'Erro ao processar campanha');
-      }
+      if (functionError) throw new Error(functionError.message);
+      if (!functionData?.success) throw new Error(functionData?.error || 'Erro desconhecido no disparo.');
 
-      if (!data?.success) {
-        throw new Error(data?.error || 'Erro desconhecido ao processar campanha');
-      }
-
+      sonner.success(`Campanha processada! ${functionData.successCount} mensagens enviadas.`);
+      
+      // Atualizar o estado local
       setCampaigns(prev => 
         prev.map(c => 
-          c.id === id ? { ...c, status: "sent" } : c
+          c.id === campaignId ? { ...c, status: "sent", total: contactIds.length, sent: functionData.successCount } : c
         )
       );
 
-      toast({
-        title: "Sucesso",
-        description: `Campanha processada! ${data.successCount} mensagens enviadas.`,
-      });
     } catch (error: any) {
       console.error('Error starting campaign:', error);
-      toast({
-        title: "Erro ao iniciar campanha",
-        description: error.message,
-        variant: "destructive",
-      });
+      sonner.error("Erro ao iniciar campanha", { description: error.message });
+    } finally {
+      setStartingCampaign(null);
     }
   };
 
@@ -250,9 +279,9 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
 
       {/* Alertas sobre créditos */}
       {!canSendMessage() && (
-        <Alert className="border-orange-200 bg-orange-50">
-          <AlertTriangle className="h-4 w-4 text-orange-600" />
-          <AlertDescription className="text-orange-800">
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
             {!subscription ? (
               "Você não possui uma assinatura ativa. Adquira um plano para criar campanhas."
             ) : subscription.credits_remaining <= 0 ? (
@@ -267,9 +296,9 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       )}
 
       {subscription && subscription.credits_remaining <= 10 && subscription.credits_remaining > 0 && (
-        <Alert className="border-yellow-200 bg-yellow-50">
-          <AlertTriangle className="h-4 w-4 text-yellow-600" />
-          <AlertDescription className="text-yellow-800">
+        <Alert className="bg-warning/10 border-warning/20 text-warning-foreground">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
             Atenção: Você possui apenas {subscription.credits_remaining} crédito(s) restante(s). 
             Considere renovar seu plano.
           </AlertDescription>
