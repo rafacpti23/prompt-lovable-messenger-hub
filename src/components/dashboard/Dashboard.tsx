@@ -13,8 +13,8 @@ import { Button } from "@/components/ui/button";
 import TutorialModal from "@/components/TutorialModal";
 
 const Dashboard = () => {
-  const { stats, loading: statsLoading } = useDashboardStats();
-  const { data: messagesByDay, loading: chartLoading } = useMessagesByDay();
+  const { data: stats, isLoading: statsLoading } = useDashboardStats();
+  const { data: messagesByDay, isLoading: chartLoading } = useMessagesByDay();
   const { subscription } = useBilling();
   const [isDispatching, setIsDispatching] = useState(false);
 
@@ -54,25 +54,25 @@ const Dashboard = () => {
   const statCards = [
     {
       title: "Mensagens Enviadas",
-      value: stats.sentMessages,
+      value: stats?.sentMessages ?? 0,
       icon: Send,
       color: "text-green-600"
     },
     {
       title: "Campanhas Ativas",
-      value: stats.activeCampaigns,
+      value: stats?.activeCampaigns ?? 0,
       icon: MessageSquare,
       color: "text-blue-600"
     },
     {
       title: "Total de Contatos",
-      value: stats.totalContacts,
+      value: stats?.totalContacts ?? 0,
       icon: Users,
       color: "text-purple-600"
     },
     {
       title: "Instâncias WhatsApp",
-      value: stats.totalInstances,
+      value: stats?.totalInstances ?? 0,
       icon: Smartphone,
       color: "text-orange-600"
     }
@@ -191,7 +191,7 @@ const Dashboard = () => {
                 <div className="h-80 flex items-center justify-center">
                   <div className="animate-pulse text-gray-500">Carregando dados...</div>
                 </div>
-              ) : messagesByDay.length === 0 ? (
+              ) : !messagesByDay || messagesByDay.length === 0 ? (
                 <div className="h-80 flex items-center justify-center text-gray-500">
                   <div className="text-center">
                     <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
@@ -238,6 +238,3 @@ const Dashboard = () => {
       </div>
     </div>
   );
-};
-
-export default Dashboard;

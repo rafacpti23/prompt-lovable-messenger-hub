@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 
@@ -11,92 +10,58 @@ export interface DashboardStats {
   totalInstances: number;
 }
 
+const fetchStats = async (userId: string): Promise<DashboardStats> => {
+  // Mensagens enviadas (messages_log)
+  const { count: sentMessages } = await supabase
+    .from("messages_log")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "sent")
+    .filter(
+      "campaign_id",
+      "in",
+      `(select id from campaigns where user_id='${userId}')`
+    );
+
+  // Campanhas
+  const { count: totalCampaigns } = await supabase
+    .from("campaigns")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId);
+
+  const { count: activeCampaigns } = await supabase
+    .from("campaigns")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .in("status", ["sending", "scheduled"]);
+
+  // Contatos
+  const { count: totalContacts } = await supabase
+    .from("contacts")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId);
+
+  // Instâncias
+  const { count: totalInstances } = await supabase
+    .from("instances")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId);
+
+  return {
+    sentMessages: sentMessages || 0,
+    activeCampaigns: activeCampaigns || 0,
+    totalCampaigns: totalCampaigns || 0,
+    totalContacts: totalContacts || 0,
+    totalInstances: totalInstances || 0,
+  };
+};
+
 export function useDashboardStats() {
   const { user } = useAuth();
-  const [stats, setStats] = useState<DashboardStats>({
-    sentMessages: 0,
-    activeCampaigns: 0,
-    totalCampaigns: 0,
-    totalContacts: 0,
-    totalInstances: 0,
+
+  return useQuery({
+    queryKey: ["dashboardStats", user?.id],
+    queryFn: () => fetchStats(user!.id),
+    enabled: !!user,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchStats() {
-      setLoading(true);
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      // Mensagens enviadas (messages_log) - apenas do usuário atual
-      let sentMessages = 0;
-      const sentMessagesResult = await supabase
-        .from("messages_log")
-        .select(`
-          id,
-          campaigns!inner(user_id)
-        `, { count: "exact", head: true })
-        .eq("status", "sent")
-        .eq("campaigns.user_id", user.id);
-        
-      if (!sentMessagesResult.error && typeof sentMessagesResult.count === "number") {
-        sentMessages = sentMessagesResult.count;
-      }
-
-      // Campanhas
-      let totalCampaigns = 0;
-      const totalCampaignsRes = await supabase
-        .from("campaigns")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id);
-      if (!totalCampaignsRes.error && typeof totalCampaignsRes.count === "number") {
-        totalCampaigns = totalCampaignsRes.count;
-      }
-
-      let activeCampaigns = 0;
-      const activeCampaignsRes = await supabase
-        .from("campaigns")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .in("status", ["active", "scheduled"]);
-      if (!activeCampaignsRes.error && typeof activeCampaignsRes.count === "number") {
-        activeCampaigns = activeCampaignsRes.count;
-      }
-
-      // Contatos
-      let totalContacts = 0;
-      const totalContactsRes = await supabase
-        .from("contacts")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id);
-      if (!totalContactsRes.error && typeof totalContactsRes.count === "number") {
-        totalContacts = totalContactsRes.count;
-      }
-
-      // Instâncias
-      let totalInstances = 0;
-      const totalInstancesRes = await supabase
-        .from("instances")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id);
-      if (!totalInstancesRes.error && typeof totalInstancesRes.count === "number") {
-        totalInstances = totalInstancesRes.count;
-      }
-
-      setStats({
-        sentMessages,
-        activeCampaigns,
-        totalCampaigns,
-        totalContacts,
-        totalInstances,
-      });
-      setLoading(false);
-    }
-
-    fetchStats();
-  }, [user]);
-
-  return { stats, loading };
 }
