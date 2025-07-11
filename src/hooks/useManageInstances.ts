@@ -8,6 +8,7 @@ import {
   connectInstance,
   deleteInstance as deleteInstanceApi,
 } from "@/services/evolutionApi";
+import { useUserSubscription } from "./useUserSubscription";
 
 export interface Instance {
   id: string;
@@ -23,6 +24,7 @@ export function useManageInstances() {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
+  const { subscription, loading: subscriptionLoading } = useUserSubscription();
 
   // Fetch instances from Supabase
   const fetchInstances = useCallback(async () => {
@@ -88,6 +90,46 @@ export function useManageInstances() {
       });
       return;
     }
+
+    // ** Validação de Plano e Limite **
+    if (subscriptionLoading) {
+      toast({ title: "Aguarde", description: "Verificando sua assinatura..." });
+      return;
+    }
+
+    if (!subscription || subscription.status !== 'active') {
+      toast({
+        title: "Plano necessário",
+        description: "Você precisa de uma assinatura ativa para criar instâncias.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const currentInstanceCount = instances.length;
+    const planName = subscription.plan.name;
+    let limit = 0;
+    let canCreate = false;
+
+    if (planName === 'trial') {
+      limit = 1;
+      if (currentInstanceCount < limit) canCreate = true;
+    } else if (planName === 'starter') {
+      limit = 3;
+      if (currentInstanceCount < limit) canCreate = true;
+    } else if (planName === 'master') {
+      canCreate = true; // Ilimitado
+    }
+
+    if (!canCreate) {
+      toast({
+        title: "Limite de instâncias atingido",
+        description: `Seu plano (${planName}) permite apenas ${limit} instância(s). Faça um upgrade para criar mais.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Registra na Evolution API
     await createInstanceApi(newInstanceName);
 
