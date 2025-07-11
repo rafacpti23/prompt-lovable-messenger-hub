@@ -48,7 +48,6 @@ serve(async (req) => {
     if (fetchError) throw new Error(`Erro ao buscar mensagens: ${fetchError.message}`);
 
     if (!messages || messages.length === 0) {
-      await supabaseClient.rpc('update_completed_campaigns');
       return new Response(JSON.stringify({ message: 'Nenhuma mensagem pendente para enviar.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -89,10 +88,8 @@ serve(async (req) => {
 
         const responseData = await response.json();
         
-        // ATUALIZAÇÃO SIMPLES PARA GARANTIR QUE NÃO FALHE
         await supabaseClient.from('scheduled_messages').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', msg.id);
         
-        // CRIA O LOG SEPARADAMENTE
         await supabaseClient.from('messages_log').insert({
             campaign_id: msg.campaign_id,
             contact_id: msg.contact_id,
@@ -106,10 +103,8 @@ serve(async (req) => {
         sentCount++;
 
       } catch (e) {
-        // ATUALIZAÇÃO SIMPLES PARA GARANTIR QUE NÃO FALHE
         await supabaseClient.from('scheduled_messages').update({ status: 'failed' }).eq('id', msg.id);
 
-        // CRIA O LOG DE ERRO SEPARADAMENTE
         await supabaseClient.from('messages_log').insert({
             campaign_id: msg.campaign_id,
             contact_id: msg.contact_id,
@@ -126,7 +121,6 @@ serve(async (req) => {
       }
     }
 
-    await supabaseClient.rpc('update_completed_campaigns');
     return new Response(JSON.stringify({ message: `${sentCount} de ${messages.length} mensagens processadas.` }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {

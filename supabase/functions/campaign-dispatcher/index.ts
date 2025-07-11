@@ -47,14 +47,6 @@ serve(async (req) => {
         }
     }
 
-    // 3. Update status of any completed campaigns
-    const { error: updateError } = await supabaseClient.rpc('update_completed_campaigns');
-    if (updateError) {
-        console.error('Error updating completed campaigns:', updateError.message);
-        // This is not a critical error, so we don't throw, just log it.
-    }
-
-
     return new Response(JSON.stringify({ message: 'Campaign dispatcher finished.', results }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
