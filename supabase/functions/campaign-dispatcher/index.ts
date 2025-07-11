@@ -28,30 +28,34 @@ serve(async (req) => {
       throw new Error(`Error fetching scheduled campaigns: ${error.message}`)
     }
 
-    if (!scheduledCampaigns || scheduledCampaigns.length === 0) {
-      return new Response(JSON.stringify({ message: 'No campaigns to prepare right now.' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
     const results = []
-    // 2. For each campaign, call the RPC function to queue it atomically
-    for (const campaign of scheduledCampaigns) {
-      const { data, error: rpcError } = await supabaseClient.rpc('queue_and_activate_campaign', {
-        campaign_id_param: campaign.id,
-      })
+    if (scheduledCampaigns && scheduledCampaigns.length > 0) {
+        // 2. For each campaign, call the RPC function to queue it atomically
+        for (const campaign of scheduledCampaigns) {
+          const { data, error: rpcError } = await supabaseClient.rpc('queue_and_activate_campaign', {
+            campaign_id_param: campaign.id,
+          })
 
-      if (rpcError) {
-        console.error(`Error processing campaign ${campaign.id}:`, rpcError.message)
-        // If the RPC fails, mark the campaign as 'failed' to prevent retries
-        await supabaseClient.from('campaigns').update({ status: 'failed' }).eq('id', campaign.id)
-        results.push({ success: false, campaignId: campaign.id, error: rpcError.message })
-      } else {
-        results.push({ success: true, campaignId: campaign.id, result: data })
-      }
+          if (rpcError) {
+            console.error(`Error processing campaign ${campaign.id}:`, rpcError.message)
+            // If the RPC fails, mark the campaign as 'failed' to prevent retries
+            await supabaseClient.from('campaigns').update({ status: 'failed' }).eq('id', campaign.id)
+            results.push({ success: false, campaignId: campaign.id, error: rpcError.message })
+          } else {
+            results.push({ success: true, campaignId: campaign.id, result: data })
+          }
+        }
     }
 
-    return new Response(JSON.stringify({ message: 'Campaign preparation finished.', results }), {
+    // 3. Update status of any completed campaigns
+    const { error: updateError } = await supabaseClient.rpc('update_completed_campaigns');
+    if (updateError) {
+        console.error('Error updating completed campaigns:', updateError.message);
+        // This is not a critical error, so we don't throw, just log it.
+    }
+
+
+    return new Response(JSON.stringify({ message: 'Campaign dispatcher finished.', results }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 

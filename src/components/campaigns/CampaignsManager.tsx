@@ -187,7 +187,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     switch (status) {
       case "draft": return "bg-gray-100 text-gray-800";
       case "scheduled": return "bg-yellow-100 text-yellow-800";
-      case "active": return "bg-blue-100 text-blue-800";
+      case "sending": return "bg-blue-100 text-blue-800";
       case "completed": return "bg-green-100 text-green-800";
       case "failed": return "bg-red-100 text-red-800";
       default: return "bg-gray-100 text-gray-800";
@@ -198,7 +198,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     switch (status) {
       case "draft": return "Rascunho";
       case "scheduled": return "Agendada";
-      case "active": return "Ativa/Enviando";
+      case "sending": return "Ativa/Enviando";
       case "completed": return "Concluída";
       case "failed": return "Falhou";
       default: return status;
@@ -225,8 +225,8 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
 
       if (rpcError) throw new Error(`Erro ao enfileirar mensagens: ${rpcError.message}`);
 
-      // Atualiza o status na UI para o status final (active ou completed)
-      const finalStatus = rpcData.includes('completed') ? 'completed' : 'active';
+      // Atualiza o status na UI para o status final (sending ou completed)
+      const finalStatus = rpcData.includes('completed') ? 'completed' : 'sending';
       setCampaigns(prev => 
         prev.map(c => c.id === campaignId ? { ...c, status: finalStatus } : c)
       );
