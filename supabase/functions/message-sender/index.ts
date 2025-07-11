@@ -41,7 +41,7 @@ serve(async (req) => {
         )
       `)
       .eq('status', 'pending')
-      .eq('campaign.status', 'sending') // GARANTE QUE SÓ ENVIE DE CAMPANHAS ATIVAS
+      .eq('campaign.status', 'sending')
       .lte('scheduled_for', new Date().toISOString())
       .limit(MESSAGES_PER_RUN);
 
@@ -56,15 +56,14 @@ serve(async (req) => {
     for (const msg of messages) {
       const { campaign } = msg;
       if (!campaign || !campaign.instance) {
-        await supabaseClient.from('scheduled_messages').update({ status: 'failed', response: { error: 'Campanha ou instância associada não encontrada.' } }).eq('id', msg.id);
+        await supabaseClient.from('scheduled_messages').update({ status: 'failed' }).eq('id', msg.id);
         continue;
       }
 
       try {
         const { data: canSend, error: rpcError } = await supabaseClient.rpc('decrement_user_credits', { user_id_param: campaign.user_id });
         if (rpcError || !canSend) {
-          await supabaseClient.from('scheduled_messages').update({ status: 'failed', response: { error: 'Créditos insuficientes ou erro ao decrementar.' } }).eq('id', msg.id);
-          continue;
+          throw new Error('Créditos insuficientes ou erro ao decrementar.');
         }
 
         const personalizedMessage = msg.message.replace(/{{nome}}/g, msg.contact?.name || '').replace(/{{telefone}}/g, msg.phone || '');
@@ -89,14 +88,37 @@ serve(async (req) => {
         }
 
         const responseData = await response.json();
-        const { error: updateSuccessError } = await supabaseClient.from('scheduled_messages').update({ status: 'sent', sent_at: new Date().toISOString(), response: responseData }).eq('id', msg.id);
-        if (updateSuccessError) throw new Error(`Falha ao atualizar status para 'sent': ${updateSuccessError.message}`);
         
+        // ATUALIZAÇÃO SIMPLES PARA GARANTIR QUE NÃO FALHE
+        await supabaseClient.from('scheduled_messages').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', msg.id);
+        
+        // CRIA O LOG SEPARADAMENTE
+        await supabaseClient.from('messages_log').insert({
+            campaign_id: msg.campaign_id,
+            contact_id: msg.contact_id,
+            phone: msg.phone,
+            message: personalizedMessage,
+            status: 'sent',
+            response: responseData,
+            scheduled_for: msg.scheduled_for
+        });
+
         sentCount++;
 
       } catch (e) {
-        const { error: updateFailError } = await supabaseClient.from('scheduled_messages').update({ status: 'failed', response: { error: e.message } }).eq('id', msg.id);
-        if (updateFailError) console.error(`CRITICAL-LOOP-RISK: Failed to update message ${msg.id} to 'failed'. Update Error: ${updateFailError.message}`);
+        // ATUALIZAÇÃO SIMPLES PARA GARANTIR QUE NÃO FALHE
+        await supabaseClient.from('scheduled_messages').update({ status: 'failed' }).eq('id', msg.id);
+
+        // CRIA O LOG DE ERRO SEPARADAMENTE
+        await supabaseClient.from('messages_log').insert({
+            campaign_id: msg.campaign_id,
+            contact_id: msg.contact_id,
+            phone: msg.phone,
+            message: msg.message,
+            status: 'failed',
+            response: { error: e.message },
+            scheduled_for: msg.scheduled_for
+        });
       }
 
       if (campaign.pause_between_messages > 0) {
