@@ -8,7 +8,7 @@
     /* Professional WhatsApp-style theme - Greens, blues, and greys */
     --background: 0 0% 100%; /* White background */
     --foreground: 240 10% 3.9%;
-    --card: 150 40% 97%; /* More noticeable green tint for cards */
+    --card: 145 60% 95%; /* More vibrant green tint for cards */
     --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
@@ -16,9 +16,9 @@
     --primary-foreground: 0 0% 100%;
     --secondary: 220 13% 91%;
     --secondary-foreground: 222 47% 11%;
-    --muted: 150 25% 94%; /* Muted green */
+    --muted: 145 40% 93%; /* Muted green */
     --muted-foreground: 215 20% 65%;
-    --accent: 150 50% 90%; /* Accent green */
+    --accent: 145 60% 90%; /* Accent green */
     --accent-foreground: 162 90% 35%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
@@ -26,7 +26,7 @@
     --warning-foreground: 48 96% 10%;
     --info: 217 91% 60%;
     --info-foreground: 0 0% 100%;
-    --border: 150 25% 90%; /* Greenish border */
+    --border: 145 40% 88%; /* Greenish border */
     --input: 0 0% 100%;
     --ring: 162 90% 35%;
     --chart-1: 162 90% 35%;
