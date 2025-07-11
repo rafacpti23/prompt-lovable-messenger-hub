@@ -21,11 +21,12 @@ const Dashboard = () => {
   const handleManualDispatch = async () => {
     setIsDispatching(true);
     toast.info("Iniciando disparo manual...", {
-      description: "Isso pode levar alguns segundos.",
+      description: "Processando a fila de mensagens agendadas.",
     });
 
     try {
-      const { data, error } = await supabase.functions.invoke('campaign-dispatcher');
+      // Chama a função que envia as mensagens da fila
+      const { data, error } = await supabase.functions.invoke('message-sender');
 
       if (error) {
         throw new Error(error.message);
@@ -114,7 +115,7 @@ const Dashboard = () => {
         <CardContent className="flex items-center gap-4">
           <Button onClick={handleManualDispatch} disabled={isDispatching}>
             <PlayCircle className="h-4 w-4 mr-2" />
-            {isDispatching ? "Disparando..." : "Testar Disparo de Campanhas"}
+            {isDispatching ? "Enviando..." : "Enviar Mensagens da Fila"}
           </Button>
           <TutorialModal />
         </CardContent>

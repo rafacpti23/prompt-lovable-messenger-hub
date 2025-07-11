@@ -30,6 +30,7 @@ serve(async (req) => {
       .from('scheduled_messages')
       .select(`
         *,
+        contact:contacts(name),
         campaign:campaigns(
           user_id,
           instance_id,
@@ -51,8 +52,8 @@ serve(async (req) => {
     // 2. Enviar cada mensagem do lote
     for (const msg of messages) {
       const { campaign } = msg
-      if (!campaign) {
-        await supabaseClient.from('scheduled_messages').update({ status: 'failed', response: { error: 'Campanha associada não encontrada.' } }).eq('id', msg.id)
+      if (!campaign || !campaign.instance) {
+        await supabaseClient.from('scheduled_messages').update({ status: 'failed', response: { error: 'Campanha ou instância associada não encontrada.' } }).eq('id', msg.id)
         continue
       }
 
@@ -69,16 +70,41 @@ serve(async (req) => {
           .replace(/{{nome}}/g, msg.contact?.name || '')
           .replace(/{{telefone}}/g, msg.phone || '')
 
-        // Enviar para a Evolution API
-        const url = `${EVOLUTION_API_URL}/message/sendText/${campaign.instance.instance_name}`
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_API_KEY },
-          body: JSON.stringify({ number: msg.phone, textMessage: { text: personalizedMessage } })
-        })
-        const responseData = await response.json()
-
-        if (!response.ok) throw new Error(responseData.message || 'Erro na API Evolution')
+        let responseData;
+        
+        // Enviar mídia ou texto
+        if (msg.media_url) {
+            const mediaType = msg.media_url.match(/\.(mp4|mov|avi)$/i) ? 'video' : 'image';
+            const url = `${EVOLUTION_API_URL}/message/sendMedia/${campaign.instance.instance_name}`;
+            const body = {
+                number: msg.phone,
+                mediaMessage: {
+                    mediaType: mediaType,
+                    url: msg.media_url,
+                    caption: personalizedMessage
+                }
+            };
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_API_KEY },
+                body: JSON.stringify(body)
+            });
+            responseData = await response.json();
+            if (!response.ok) throw new Error(responseData.message || 'Erro na API Evolution ao enviar mídia');
+        } else {
+            const url = `${EVOLUTION_API_URL}/message/sendText/${campaign.instance.instance_name}`;
+            const body = {
+                number: msg.phone,
+                textMessage: { text: personalizedMessage }
+            };
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_API_KEY },
+                body: JSON.stringify(body)
+            });
+            responseData = await response.json();
+            if (!response.ok) throw new Error(responseData.message || 'Erro na API Evolution ao enviar texto');
+        }
 
         // Atualizar status da mensagem para 'sent'
         await supabaseClient.from('scheduled_messages').update({ status: 'sent', sent_at: new Date().toISOString(), response: responseData }).eq('id', msg.id)

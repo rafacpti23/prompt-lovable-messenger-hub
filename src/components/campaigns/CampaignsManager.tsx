@@ -26,6 +26,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
 
   // Estados para o formulário
   const [newCampaign, setNewCampaign] = useState({ name: "", message: "" });
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [contactSource, setContactSource] = useState<"supabase" | "google">("supabase");
   const [googleConnected, setGoogleConnected] = useState(false);
   const [googleSheetName, setGoogleSheetName] = useState<string | null>(null);
@@ -55,6 +56,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     setShowCreateForm(false);
     // Resetar formulário
     setNewCampaign({ name: "", message: "" });
+    setMediaUrl(null);
     setSelectedGroup("");
     setSelectedInstanceId("");
     setScheduleDate("");
@@ -126,6 +128,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
           instance_id: selectedInstanceId,
           name: newCampaign.name,
           message: newCampaign.message,
+          media_url: mediaUrl,
           contact_ids: contactIds,
           status: "draft",
           scheduled_for: scheduledForISO

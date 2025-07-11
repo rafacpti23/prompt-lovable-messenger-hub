@@ -20,6 +20,8 @@ interface Instance {
 interface CampaignFormProps {
   newCampaign: { name: string; message: string };
   setNewCampaign: (c: { name: string; message: string }) => void;
+  mediaUrl: string | null;
+  setMediaUrl: (url: string | null) => void;
   contactSource: "supabase" | "google";
   setContactSource: (source: "supabase" | "google") => void;
   googleConnected: boolean;
@@ -50,6 +52,8 @@ const GOOGLE_STORAGE_KEY = "googleContactsSheetId";
 const CampaignForm: React.FC<CampaignFormProps> = ({
   newCampaign,
   setNewCampaign,
+  mediaUrl,
+  setMediaUrl,
   contactSource,
   setContactSource,
   googleConnected,
@@ -75,33 +79,19 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
   setSelectedInstanceId,
 }) => {
   const [messageType, setMessageType] = useState<"text" | "image" | "video">("text");
-  const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string>("");
-  const [mediaUrl, setMediaUrl] = useState<string>("");
   const [showPreview, setShowPreview] = useState(false);
   const [showMediaRepository, setShowMediaRepository] = useState(false);
 
-  const handleMediaUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setMediaFile(file);
-      const reader = new FileReader();
-      reader.onload = () => {
-        setMediaPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const removeMedia = () => {
-    setMediaFile(null);
+    setMediaUrl(null);
     setMediaPreview("");
-    setMediaUrl("");
   };
 
   const handleSelectFromRepository = (media: any) => {
     setMediaUrl(media.file_url);
     setMediaPreview(media.file_url);
+    setMessageType(media.file_type.startsWith('image') ? 'image' : 'video');
     setShowMediaRepository(false);
   };
 
@@ -127,7 +117,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
       selectedInstanceId &&
       newCampaign.name.trim() &&
       selectedGroup &&
-      (messageType === "text" ? newCampaign.message.trim() : (mediaFile || mediaUrl))
+      (messageType === "text" ? newCampaign.message.trim() : mediaUrl)
     );
   };
 
@@ -248,7 +238,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
               <Button
                 variant={messageType === "text" ? "default" : "outline"}
                 size="sm"
-                onClick={() => setMessageType("text")}
+                onClick={() => { setMessageType("text"); removeMedia(); }}
                 type="button"
               >
                 Texto
@@ -276,38 +266,23 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
           {messageType !== "text" && (
             <div>
               <label className="block font-medium mb-2">
-                Upload de {messageType === "image" ? "Imagem" : "Vídeo"}: *
+                Mídia: *
               </label>
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <input
-                    type="file"
-                    accept={messageType === "image" ? "image/*" : "video/*"}
-                    onChange={handleMediaUpload}
-                    className="hidden"
-                    id="media-upload"
-                  />
-                  <Button
-                    variant="outline"
-                    onClick={() => document.getElementById("media-upload")?.click()}
-                    type="button"
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload {messageType === "image" ? "Imagem" : "Vídeo"}
-                  </Button>
                   <Button
                     variant="outline"
                     onClick={() => setShowMediaRepository(true)}
                     type="button"
                   >
                     <Image className="h-4 w-4 mr-2" />
-                    Repositório
+                    Selecionar do Repositório
                   </Button>
                 </div>
-                {(mediaFile || mediaUrl) && (
+                {mediaUrl && (
                   <div className="flex items-center gap-2 p-2 bg-muted rounded">
-                    <span className="text-sm">
-                      {mediaFile ? mediaFile.name : "Mídia do repositório"}
+                    <span className="text-sm truncate">
+                      {mediaUrl}
                     </span>
                     <Button
                       variant="outline"
