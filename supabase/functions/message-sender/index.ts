@@ -46,11 +46,11 @@ serve(async (req) => {
         )
       `)
       .eq('status', 'pending')
+      .lte('scheduled_for', new Date().toISOString()) // FILTRO ADICIONADO: Apenas pegar mensagens cujo horário de envio já chegou
       .limit(MESSAGES_PER_RUN)
 
     if (fetchError) throw new Error(`Erro ao buscar mensagens: ${fetchError.message}`)
     if (!messages || messages.length === 0) {
-      // Mesmo sem mensagens, vamos verificar se alguma campanha antiga pode ser completada
       const { error: updateError } = await supabaseClient.rpc('update_completed_campaigns');
       if (updateError) {
         console.error('Error updating completed campaigns status (no pending messages):', updateError.message);
@@ -118,11 +118,8 @@ serve(async (req) => {
       }
     }
 
-    // **CORREÇÃO APLICADA AQUI**
-    // Após processar o lote de mensagens, verifica e atualiza o status das campanhas concluídas.
     const { error: updateError } = await supabaseClient.rpc('update_completed_campaigns');
     if (updateError) {
-        // Loga o erro mas não falha a função inteira, pois o envio das mensagens pode ter sido um sucesso.
         console.error('Error updating completed campaigns status:', updateError.message);
     }
 
