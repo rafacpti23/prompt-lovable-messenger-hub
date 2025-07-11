@@ -1,7 +1,7 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Play, Trash2, ListChecks } from "lucide-react";
+import { Play, Trash2, ListChecks, Pause } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Campaign {
@@ -20,6 +20,7 @@ interface CampaignListProps {
   getStatusColor: (status: string) => string;
   getStatusText: (status: string) => string;
   onStartCampaign?: (id: string) => void;
+  onPauseCampaign?: (id: string) => void;
   onShowDetails: (id: string) => void;
 }
 
@@ -29,6 +30,7 @@ const CampaignList: React.FC<CampaignListProps> = ({
   getStatusColor,
   getStatusText,
   onStartCampaign,
+  onPauseCampaign,
   onShowDetails,
 }) => {
   return (
@@ -68,6 +70,26 @@ const CampaignList: React.FC<CampaignListProps> = ({
                   >
                     <Play className="h-4 w-4 mr-2" />
                     Iniciar
+                  </Button>
+                )}
+                {campaign.status === "sending" && onPauseCampaign && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onPauseCampaign(campaign.id)}
+                  >
+                    <Pause className="h-4 w-4 mr-2" />
+                    Pausar
+                  </Button>
+                )}
+                {campaign.status === "paused" && onStartCampaign && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onStartCampaign(campaign.id)}
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    Retomar
                   </Button>
                 )}
                 <Button 

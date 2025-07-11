@@ -194,6 +194,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       case "draft": return "bg-gray-100 text-gray-800";
       case "scheduled": return "bg-yellow-100 text-yellow-800";
       case "sending": return "bg-blue-100 text-blue-800";
+      case "paused": return "bg-orange-100 text-orange-800";
       case "completed": return "bg-green-100 text-green-800";
       case "failed": return "bg-red-100 text-red-800";
       default: return "bg-gray-100 text-gray-800";
@@ -205,6 +206,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       case "draft": return "Rascunho";
       case "scheduled": return "Agendada";
       case "sending": return "Ativa/Enviando";
+      case "paused": return "Pausada";
       case "completed": return "Concluída";
       case "failed": return "Falhou";
       default: return status;
@@ -250,6 +252,20 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       );
     } finally {
       setStartingCampaign(null);
+    }
+  };
+
+  const pauseCampaign = async (campaignId: string) => {
+    try {
+      const { error } = await supabase
+        .from("campaigns")
+        .update({ status: 'paused' })
+        .eq("id", campaignId);
+      if (error) throw error;
+      setCampaigns(prev => prev.map(c => c.id === campaignId ? { ...c, status: 'paused' } : c));
+      sonner.success("Campanha pausada com sucesso.");
+    } catch (error: any) {
+      sonner.error("Erro ao pausar campanha", { description: error.message });
     }
   };
 
@@ -341,6 +357,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         getStatusColor={getStatusColor}
         getStatusText={getStatusText}
         onStartCampaign={onStartCampaign}
+        onPauseCampaign={pauseCampaign}
         onShowDetails={(id) => setDetailsModal({ open: true, campaignId: id })}
       />
 
