@@ -75,7 +75,6 @@ serve(async (req) => {
           .replace(/{{telefone}}/g, msg.phone || '')
 
         let response;
-        let responseData;
         const headers = { 'Content-Type': 'application/json', 'apikey': EVOLUTION_API_KEY };
 
         if (msg.media_url) {
@@ -85,7 +84,8 @@ serve(async (req) => {
           response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
         } else {
           const url = `${evolutionApiUrl}/message/sendText/${campaign.instance.instance_name}`;
-          const body = { number: msg.phone, textMessage: { text: personalizedMessage } };
+          // CORREÇÃO APLICADA AQUI
+          const body = { number: msg.phone, text: personalizedMessage };
           response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
         }
 
@@ -101,7 +101,7 @@ serve(async (req) => {
           throw new Error(errorJson.message || `HTTP error! status: ${response.status}`);
         }
 
-        responseData = await response.json();
+        const responseData = await response.json();
         await supabaseClient.from('scheduled_messages').update({ status: 'sent', sent_at: new Date().toISOString(), response: responseData }).eq('id', msg.id)
         sentCount++
 
