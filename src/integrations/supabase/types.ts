@@ -17,7 +17,6 @@ export type Database = {
       campaigns: {
         Row: {
           contact_ids: string[]
-          contact_group: string | null
           created_at: string
           id: string
           instance_id: string
@@ -31,7 +30,6 @@ export type Database = {
         }
         Insert: {
           contact_ids: string[]
-          contact_group?: string | null
           created_at?: string
           id?: string
           instance_id: string
@@ -45,7 +43,6 @@ export type Database = {
         }
         Update: {
           contact_ids?: string[]
-          contact_group?: string | null
           created_at?: string
           id?: string
           instance_id?: string

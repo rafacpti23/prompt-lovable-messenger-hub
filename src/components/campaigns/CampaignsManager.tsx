@@ -37,7 +37,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
   const [selectedInstanceId, setSelectedInstanceId] = useState("");
 
   // Buscar instâncias reais do usuário
-  const [instances, setInstances] = useState<Array<{id: string, instance_name: string, status: string}>>([]);
+  const [instances, setInstances] = useState<Array<{id: string, instance_name: string, status: string | null}>>([]);
   
   React.useEffect(() => {
     const fetchInstances = async () => {
@@ -76,6 +76,27 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     }
 
     try {
+      // Buscar contatos para o grupo selecionado
+      const { data: contacts, error: contactsError } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('user_id', user.id)
+        .contains('tags', [selectedGroup]);
+
+      if (contactsError) {
+        throw new Error("Erro ao buscar contatos do grupo.");
+      }
+      if (!contacts || contacts.length === 0) {
+        toast({
+          title: "Grupo vazio",
+          description: `Nenhum contato encontrado no grupo "${selectedGroup}". Adicione contatos ao grupo antes de criar a campanha.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const contactIds = contacts.map(c => c.id);
+
       const { data, error } = await supabase
         .from("campaigns")
         .insert({
@@ -83,8 +104,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
           instance_id: selectedInstanceId,
           name: newCampaign.name,
           message: newCampaign.message,
-          contact_group: selectedGroup,
-          contact_ids: [],
+          contact_ids: contactIds,
           status: "draft"
         })
         .select()
@@ -106,7 +126,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         status: data.status || "draft",
         created_at: data.created_at,
         sent: 0,
-        total: 0,
+        total: contactIds.length,
       }, ...prev]);
     } catch (error: any) {
       toast({
@@ -167,39 +187,15 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     setStartingCampaign(campaignId);
 
     try {
-      // 1. Buscar a campanha para obter o grupo de contatos
-      const { data: campaign, error: campaignError } = await supabase
-        .from('campaigns')
-        .select('contact_group')
-        .eq('id', campaignId)
-        .single();
-
-      if (campaignError || !campaign) throw new Error("Campanha não encontrada.");
-      if (!campaign.contact_group) throw new Error("Grupo de contatos não definido para esta campanha.");
-
-      // 2. Buscar os contatos do grupo
-      const { data: contacts, error: contactsError } = await supabase
-        .from('contacts')
-        .select('id')
-        .eq('user_id', user.id)
-        .contains('tags', [campaign.contact_group]);
-
-      if (contactsError) throw new Error("Erro ao buscar contatos.");
-      if (!contacts || contacts.length === 0) {
-        throw new Error(`Nenhum contato encontrado no grupo "${campaign.contact_group}".`);
-      }
-
-      const contactIds = contacts.map(c => c.id);
-
-      // 3. Atualizar a campanha com os IDs dos contatos e status "scheduled"
+      // 1. Atualizar status da campanha para "scheduled"
       const { error: updateError } = await supabase
         .from('campaigns')
-        .update({ contact_ids: contactIds, status: 'scheduled' })
+        .update({ status: 'scheduled' })
         .eq('id', campaignId);
 
-      if (updateError) throw new Error("Erro ao preparar campanha para envio.");
+      if (updateError) throw new Error("Erro ao agendar campanha.");
 
-      // 4. Chamar a edge function para disparar
+      // 2. Chamar a edge function para disparar
       sonner.info("Iniciando envio da campanha...");
       const { data: functionData, error: functionError } = await supabase.functions.invoke('campaign-dispatcher', {
         body: { campaignId: campaignId }
@@ -212,9 +208,14 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       
       // Atualizar o estado local
       setCampaigns(prev => 
-        prev.map(c => 
-          c.id === campaignId ? { ...c, status: "sent", total: contactIds.length, sent: functionData.successCount } : c
-        )
+        prev.map(c => {
+          if (c.id === campaignId) {
+            const campaignToUpdate = campaigns.find(camp => camp.id === campaignId);
+            const totalContacts = campaignToUpdate?.total || 0;
+            return { ...c, status: "sent", sent: functionData.successCount, total: totalContacts };
+          }
+          return c;
+        })
       );
 
     } catch (error: any) {
