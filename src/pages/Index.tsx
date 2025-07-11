@@ -26,6 +26,10 @@ const MainApp = () => {
     window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   const [theme, setTheme] = useState<"light" | "dark">(getDefaultTheme());
 
+  // Hooks must be called at the top level
+  const { user, signOut, isLoading } = useAuth();
+  const { profile } = useUserProfile();
+
   // Use payment verification hook
   usePaymentVerification();
 
@@ -42,26 +46,14 @@ const MainApp = () => {
     new Set(contacts.map(c => c.group).filter(Boolean))
   );
 
-  let user, signOut, isLoading, error;
-  let contextError = null;
-  let profile = null;
-  try {
-    const auth = useAuth();
-    const profileData = useUserProfile();
-    user = auth.user;
-    signOut = auth.signOut;
-    isLoading = auth.isLoading;
-    profile = profileData.profile;
-    console.log("Auth info", { user, isLoading });
-  } catch (e) {
-    console.error("Erro no useAuth:", e);
-    contextError = e;
-  }
-
   useEffect(() => {
     async function fetchContacts() {
       setLoadingContacts(true);
-      if (!user) return;
+      if (!user) {
+        setContacts([]);
+        setLoadingContacts(false);
+        return;
+      }
       const { data, error } = await supabase
         .from('contacts')
         .select('*')
@@ -77,31 +69,10 @@ const MainApp = () => {
       }
       setLoadingContacts(false);
     }
-    if (user) fetchContacts();
+    if (user) {
+      fetchContacts();
+    }
   }, [user]);
-
-  if (contextError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-red-100 flex-col">
-        <div className="text-2xl font-bold text-red-700 mb-4">Erro crítico no carregamento</div>
-        <div className="bg-white px-6 py-4 rounded">{String(contextError.message || contextError)}</div>
-        <div className="text-gray-500 text-sm mt-2">
-          Verifique se todos os arquivos existem e se não há erros nos imports.
-        </div>
-      </div>
-    );
-  }
-
-  if (typeof isLoading === "undefined") {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-blue-50">
-        <div className="text-lg text-blue-700 bg-white px-10 py-6 rounded shadow">
-          <div className="font-bold text-2xl">Carregando...</div>
-          <div className="text-sm mt-2">Inicializando componentes.</div>
-        </div>
-      </div>
-    );
-  }
 
   if (isLoading) {
     return (
