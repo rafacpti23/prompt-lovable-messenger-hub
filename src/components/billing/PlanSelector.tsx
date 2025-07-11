@@ -31,8 +31,6 @@ const PlanSelector: React.FC = () => {
       
       if (result.error) {
         toast.error(`Erro: ${result.error}`);
-      } else if (planName === "trial") {
-        toast.success("Plano trial ativado com sucesso!");
       } else {
         toast.success("Redirecionando para pagamento...");
       }
@@ -65,27 +63,16 @@ const PlanSelector: React.FC = () => {
     );
   }
 
-  const planDetails = plans.map(plan => {
+  // Filtrar para não mostrar o plano trial
+  const paidPlans = plans.filter(plan => plan.name !== 'trial');
+
+  const planDetails = paidPlans.map(plan => {
     let description = "";
     let features: string[] = [];
     let popular = false;
     let benefits: string[] = [];
 
     switch (plan.name) {
-      case "trial":
-        description = "Para testar o sistema";
-        features = [
-          `${plan.credits} mensagens grátis`,
-          "1 instância WhatsApp",
-          "Suporte básico",
-          `Válido por ${plan.duration_days} dia${plan.duration_days > 1 ? 's' : ''}`
-        ];
-        benefits = [
-          "Teste todas as funcionalidades",
-          "Sem compromisso",
-          "Ativação imediata"
-        ];
-        break;
       case "starter":
         description = "Ideal para pequenos negócios";
         popular = true;
@@ -190,8 +177,7 @@ const PlanSelector: React.FC = () => {
             
             <CardHeader className="text-center">
               <CardTitle className="text-xl font-bold capitalize">
-                {plan.name === "trial" ? "Teste Gratuito" : 
-                 plan.name === "starter" ? "Plano Starter" :
+                {plan.name === "starter" ? "Plano Starter" :
                  plan.name === "master" ? "Plano Master" : plan.name}
               </CardTitle>
               <div className="mt-4">
@@ -199,12 +185,12 @@ const PlanSelector: React.FC = () => {
                   R$ {plan.price.toFixed(2).replace('.', ',')}
                 </span>
                 <span className="text-gray-500">
-                  {plan.name === "trial" ? "" : "/mês"}
+                  /mês
                 </span>
               </div>
               <p className="text-sm text-gray-600 dark:text-gray-300">{plan.description}</p>
               <div className="text-sm text-primary font-medium">
-                {plan.name === "trial" ? "Grátis" : `${plan.pricePerMessage} por mensagem`}
+                {`${plan.pricePerMessage} por mensagem`}
               </div>
             </CardHeader>
             
@@ -247,8 +233,6 @@ const PlanSelector: React.FC = () => {
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Processando...
                   </>
-                ) : plan.name === "trial" ? (
-                  "Ativar Teste Grátis"
                 ) : (
                   <>
                     <ExternalLink className="h-4 w-4 mr-2" />

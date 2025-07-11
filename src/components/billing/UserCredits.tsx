@@ -2,8 +2,9 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { CreditCard, MessageSquare, Calendar, AlertTriangle } from "lucide-react";
+import { CreditCard, MessageSquare, Calendar, AlertTriangle, Star } from "lucide-react";
 import { useUserSubscription } from "@/hooks/useUserSubscription";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const UserCredits: React.FC = () => {
   const { subscription, loading } = useUserSubscription();
@@ -58,6 +59,7 @@ const UserCredits: React.FC = () => {
 
   const isExpired = subscription.expires_at && new Date(subscription.expires_at) < new Date();
   const isLowCredits = subscription.credits_remaining <= 10 && subscription.plan.name !== "trial";
+  const isTrial = subscription.plan.name === "trial";
 
   return (
     <Card>
@@ -67,6 +69,15 @@ const UserCredits: React.FC = () => {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
+          {isTrial && !isExpired && (
+            <Alert className="bg-blue-50 border-blue-200 text-blue-800">
+              <Star className="h-4 w-4" />
+              <AlertDescription>
+                Você está no período de teste gratuito. Aproveite para explorar todos os recursos!
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <MessageSquare className="h-4 w-4 text-primary" />
