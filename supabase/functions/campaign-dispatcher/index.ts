@@ -81,11 +81,16 @@ async function processCampaign(campaignId: string, supabaseClient: any) {
 
       if (!instance) throw new Error('Instância não encontrada')
 
+      // ** Substituir variáveis na mensagem **
+      const personalizedMessage = campaign.message
+        .replace(/{{nome}}/g, contact.name || '')
+        .replace(/{{telefone}}/g, contact.phone || '');
+
       const url = `${evolutionApiUrl}/message/sendText/${instance.instance_name}`
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey },
-        body: JSON.stringify({ number: contact.phone, text: campaign.message })
+        body: JSON.stringify({ number: contact.phone, text: personalizedMessage })
       })
       const responseData = await response.json()
 
@@ -95,7 +100,7 @@ async function processCampaign(campaignId: string, supabaseClient: any) {
           campaign_id: campaignId,
           contact_id: contact.id,
           phone: contact.phone,
-          message: campaign.message,
+          message: personalizedMessage, // Salvar mensagem personalizada
           status: 'sent',
           response: responseData,
           sent_at: new Date().toISOString()
@@ -110,7 +115,7 @@ async function processCampaign(campaignId: string, supabaseClient: any) {
         campaign_id: campaignId,
         contact_id: contact.id,
         phone: contact.phone,
-        message: campaign.message,
+        message: campaign.message, // Salvar mensagem original em caso de erro
         status: 'failed',
         response: { error: error.message },
         sent_at: new Date().toISOString()
