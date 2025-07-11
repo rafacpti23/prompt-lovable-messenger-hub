@@ -25,7 +25,6 @@ const Dashboard = () => {
     });
 
     try {
-      // Chama a função que envia as mensagens da fila
       const { data, error } = await supabase.functions.invoke('message-sender');
 
       if (error) {
@@ -107,7 +106,6 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/* Card de Ações Manuais */}
       <Card>
         <CardHeader>
           <CardTitle>Ações do Sistema</CardTitle>
@@ -121,7 +119,6 @@ const Dashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Cards de créditos e estatísticas */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
           <UserCredits />
@@ -151,7 +148,6 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Seção de benefícios - mostrar apenas se não tiver assinatura ativa */}
       {(!subscription || subscription.status !== "active") && (
         <div className="bg-gradient-to-r from-blue-50 to-green-50 p-6 rounded-lg border border-blue-200">
           <div className="text-center mb-6">
@@ -179,7 +175,6 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Grid com gráfico e informações da API */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <Card>
@@ -238,3 +233,6 @@ const Dashboard = () => {
       </div>
     </div>
   );
+};
+
+export default Dashboard;
