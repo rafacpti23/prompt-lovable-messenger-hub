@@ -1,7 +1,7 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Play, Pause, Trash2 } from "lucide-react";
+import { Play, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Campaign {
@@ -38,7 +38,6 @@ const CampaignList: React.FC<CampaignListProps> = ({
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
                   <h3 className="font-semibold">{campaign.name}</h3>
-                  {/* group/badge removed, don't display group */}
                   <Badge className={getStatusColor(campaign.status)}>
                     {getStatusText(campaign.status)}
                   </Badge>
@@ -59,18 +58,6 @@ const CampaignList: React.FC<CampaignListProps> = ({
                   >
                     <Play className="h-4 w-4 mr-2" />
                     Iniciar
-                  </Button>
-                )}
-                {campaign.status === "active" && (
-                  <Button variant="outline" size="sm" disabled>
-                    <Pause className="h-4 w-4 mr-2" />
-                    Pausar
-                  </Button>
-                )}
-                {campaign.status === "paused" && (
-                  <Button variant="outline" size="sm" disabled>
-                    <Play className="h-4 w-4 mr-2" />
-                    Retomar
                   </Button>
                 )}
                 <Button 
