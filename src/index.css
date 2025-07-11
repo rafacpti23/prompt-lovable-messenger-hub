@@ -6,19 +6,19 @@
 @layer base {
   :root {
     /* Professional WhatsApp-style theme - Greens, blues, and greys */
-    --background: 210 17% 96%; /* #F0F2F5 */
-    --foreground: 240 10% 3.9%; /* #0A0A0A */
-    --card: 0 0% 100%; /* #FFFFFF */
+    --background: 210 20% 98%; /* Lighter grey */
+    --foreground: 240 10% 3.9%;
+    --card: 150 30% 99%; /* Very subtle green tint */
     --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
-    --primary: 162 90% 35%; /* #07907D */
+    --primary: 162 90% 35%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 13% 91%; /* #E6ECF0 */
+    --secondary: 220 13% 91%;
     --secondary-foreground: 222 47% 11%;
     --muted: 220 13% 91%;
     --muted-foreground: 215 20% 65%;
-    --accent: 160 84% 90%; /* #D2F7EB */
+    --accent: 160 84% 94%; /* Lighter accent */
     --accent-foreground: 162 90% 35%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
@@ -26,7 +26,7 @@
     --warning-foreground: 48 96% 10%;
     --info: 217 91% 60%;
     --info-foreground: 0 0% 100%;
-    --border: 214 32% 91%;
+    --border: 160 30% 90%; /* Greenish border */
     --input: 0 0% 100%;
     --ring: 162 90% 35%;
     --chart-1: 162 90% 35%;
