@@ -331,6 +331,51 @@ export type Database = {
         }
         Relationships: []
       }
+      media_repository: {
+        Row: {
+          created_at: string
+          description: string | null
+          file_size: number
+          file_type: string
+          file_url: string
+          filename: string
+          id: string
+          original_name: string
+          tags: string[] | null
+          thumbnail_url: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          file_size: number
+          file_type: string
+          file_url: string
+          filename: string
+          id?: string
+          original_name: string
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          file_size?: number
+          file_type?: string
+          file_url?: string
+          filename?: string
+          id?: string
+          original_name?: string
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       messages_log: {
         Row: {
           campaign_id: string | null
