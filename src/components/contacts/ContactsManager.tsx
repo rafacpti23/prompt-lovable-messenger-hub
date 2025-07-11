@@ -1,24 +1,24 @@
-import React, { useEffect } from "react";
-import { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Users, Plus, Search, Trash2, Upload, Edit } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Users, Plus, Search, Trash2, Upload, Edit, Move } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import GroupSelector from "./GroupSelector";
 import EditContactModal from "./EditContactModal";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Contact {
-  id: string; // Agora UUID
+  id: string;
   name: string;
   phone: string;
   group?: string;
   created_at?: string;
   updated_at?: string;
   user_id?: string;
-  tags?: string[]; // keep for db compatibility
+  tags?: string[];
   [key: string]: any;
 }
 
@@ -35,6 +35,8 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
   const [newContact, setNewContact] = useState({ name: "", phone: "", group: "" });
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
+  const [targetGroup, setTargetGroup] = useState("");
   const { toast } = useToast();
 
   const filteredContacts = contacts.filter(contact =>
@@ -42,6 +44,64 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
     contact.phone?.includes(searchTerm) ||
     (contact.group?.toLowerCase().includes(searchTerm.toLowerCase())))
   );
+
+  const handleSelectContact = (contactId: string, isSelected: boolean) => {
+    if (isSelected) {
+      setSelectedContacts(prev => [...prev, contactId]);
+    } else {
+      setSelectedContacts(prev => prev.filter(id => id !== contactId));
+    }
+  };
+
+  const handleSelectAll = (isSelected: boolean) => {
+    if (isSelected) {
+      setSelectedContacts(filteredContacts.map(c => c.id));
+    } else {
+      setSelectedContacts([]);
+    }
+  };
+
+  const handleMoveContacts = async () => {
+    if (selectedContacts.length === 0 || !targetGroup) {
+      toast({
+        title: "Ação necessária",
+        description: "Selecione contatos e um grupo de destino.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("contacts")
+        .update({ tags: [targetGroup] })
+        .in("id", selectedContacts);
+
+      if (error) throw error;
+
+      setContacts(prevContacts =>
+        prevContacts.map(contact =>
+          selectedContacts.includes(contact.id)
+            ? { ...contact, group: targetGroup, tags: [targetGroup] }
+            : contact
+        )
+      );
+
+      toast({
+        title: "Sucesso!",
+        description: `${selectedContacts.length} contato(s) movido(s) para o grupo "${targetGroup}".`
+      });
+
+      setSelectedContacts([]);
+      setTargetGroup("");
+    } catch (error: any) {
+      toast({
+        title: "Erro ao mover contatos",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
 
   const handleCreateGroup = (group: string) => {
     if (groups.includes(group)) {
@@ -75,12 +135,11 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
       return;
     }
 
-    // Insere contato no Supabase
     const insertObj = {
       user_id: user.id,
       name: newContact.name,
       phone: newContact.phone,
-      tags: [newContact.group], // Store group in tags[0]
+      tags: [newContact.group],
     };
 
     const { data, error } = await supabase.from("contacts").insert([insertObj]).select().single();
@@ -129,7 +188,6 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
           <h2 className="text-2xl font-bold text-foreground">Gerenciar Contatos</h2>
         </div>
       </div>
-      {/* Adicionar Contato */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -163,12 +221,11 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
         </CardContent>
       </Card>
 
-      {/* Busca e Importação */}
       <Card>
         <CardHeader>
-          <CardTitle>Buscar e Importar</CardTitle>
+          <CardTitle>Buscar e Gerenciar</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="flex gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -184,13 +241,42 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
               Importar CSV
             </Button>
           </div>
+          {selectedContacts.length > 0 && (
+            <div className="p-4 bg-muted rounded-lg space-y-3">
+              <h4 className="font-semibold">{selectedContacts.length} contato(s) selecionado(s)</h4>
+              <div className="flex items-end gap-3">
+                <div className="flex-grow">
+                  <label className="text-sm font-medium">Mover para o grupo:</label>
+                  <GroupSelector
+                    groups={groups}
+                    value={targetGroup}
+                    onChange={setTargetGroup}
+                    onCreateGroup={() => {}}
+                  />
+                </div>
+                <Button onClick={handleMoveContacts} disabled={!targetGroup}>
+                  <Move className="h-4 w-4 mr-2" />
+                  Mover
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Lista de Contatos */}
       <Card>
         <CardHeader>
-          <CardTitle>Contatos ({filteredContacts.length})</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Contatos ({filteredContacts.length})</CardTitle>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="select-all"
+                checked={selectedContacts.length === filteredContacts.length && filteredContacts.length > 0}
+                onCheckedChange={(checked) => handleSelectAll(Boolean(checked))}
+              />
+              <label htmlFor="select-all" className="text-sm font-medium">Selecionar todos</label>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -212,6 +298,10 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
                   className="flex items-center justify-between p-2 border border-border rounded-lg hover:bg-accent/50 transition-colors"
                 >
                   <div className="flex items-center space-x-3 min-w-0 flex-1">
+                    <Checkbox
+                      checked={selectedContacts.includes(contact.id)}
+                      onCheckedChange={(checked) => handleSelectContact(contact.id, Boolean(checked))}
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-sm truncate">{contact.name}</p>
