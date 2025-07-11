@@ -1,16 +1,54 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { MessageSquare, Users, Send, Smartphone, Star, TrendingUp } from "lucide-react";
+import { MessageSquare, Users, Send, Smartphone, Star, TrendingUp, PlayCircle } from "lucide-react";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { useMessagesByDay } from "@/hooks/useMessagesByDay";
 import UserCredits from "@/components/billing/UserCredits";
 import EvolutionApiInfo from "@/components/settings/EvolutionApiInfo";
 import { useBilling } from "@/hooks/useBilling";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import TutorialModal from "@/components/TutorialModal";
 
 const Dashboard = () => {
   const { stats, loading: statsLoading } = useDashboardStats();
   const { data: messagesByDay, loading: chartLoading } = useMessagesByDay();
   const { subscription } = useBilling();
+  const [isDispatching, setIsDispatching] = useState(false);
+
+  const handleManualDispatch = async () => {
+    setIsDispatching(true);
+    toast.info("Iniciando disparo manual...", {
+      description: "Isso pode levar alguns segundos.",
+    });
+
+    try {
+      const { data, error } = await supabase.functions.invoke('campaign-dispatcher');
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      console.log("Manual dispatch response:", data);
+      toast.success("Disparo manual concluído!", {
+        description: data.message || "Verifique o status das suas campanhas.",
+      });
+
+    } catch (error: any) {
+      console.error("Erro no disparo manual:", error);
+      toast.error("Falha no disparo manual", {
+        description: error.message,
+      });
+    } finally {
+      setIsDispatching(false);
+    }
+  };
 
   const statCards = [
     {
@@ -68,6 +106,20 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
+      {/* Card de Ações Manuais */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Ações do Sistema</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center gap-4">
+          <Button onClick={handleManualDispatch} disabled={isDispatching}>
+            <PlayCircle className="h-4 w-4 mr-2" />
+            {isDispatching ? "Disparando..." : "Testar Disparo de Campanhas"}
+          </Button>
+          <TutorialModal />
+        </CardContent>
+      </Card>
+
       {/* Cards de créditos e estatísticas */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
