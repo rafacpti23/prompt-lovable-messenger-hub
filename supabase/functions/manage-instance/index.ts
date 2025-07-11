@@ -6,20 +6,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Credenciais padrão da Evolution API
+const EVOLUTION_API_URL = 'https://api.ramelseg.com.br';
+const EVOLUTION_API_KEY = 'd86920ba398e31464c46401214779885';
+
 // Helper to make requests to Evolution API
 async function fetchEvolutionAPI(path: string, method: string, body?: object) {
-  const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
-  const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
-
-  if (!evolutionApiUrl || !evolutionApiKey) {
-    throw new Error('Evolution API não configurada nas variáveis de ambiente.')
+  if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
+    throw new Error('As credenciais da Evolution API não estão configuradas.')
   }
 
-  const response = await fetch(`${evolutionApiUrl}${path}`, {
+  const response = await fetch(`${EVOLUTION_API_URL}${path}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
-      'apikey': evolutionApiKey,
+      'apikey': EVOLUTION_API_KEY,
     },
     body: body ? JSON.stringify(body) : undefined,
   })

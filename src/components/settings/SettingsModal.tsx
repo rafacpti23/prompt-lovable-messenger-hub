@@ -22,8 +22,6 @@ const SettingsModal = ({ open, onOpenChange, theme, setTheme }: SettingsModalPro
   const { toast } = useToast();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("general");
-  const [apiUrl, setApiUrl] = useState(localStorage.getItem('evolution_api_url') || '');
-  const [apiKey, setApiKey] = useState(localStorage.getItem('evolution_api_key') || '');
   const [messageInterval, setMessageInterval] = useState(localStorage.getItem('message_interval') || '5');
   const [loading, setSaving] = useState(false);
 
@@ -44,12 +42,6 @@ const SettingsModal = ({ open, onOpenChange, theme, setTheme }: SettingsModalPro
     try {
       // Salvar configurações gerais
       localStorage.setItem('message_interval', messageInterval);
-      
-      // Salvar configurações da API Evolution para todos os usuários (só admin pode fazer isso)
-      if (isAdmin) {
-        localStorage.setItem('evolution_api_url', apiUrl);
-        localStorage.setItem('evolution_api_key', apiKey);
-      }
       
       toast({
         title: "Configurações salvas",
@@ -90,14 +82,6 @@ const SettingsModal = ({ open, onOpenChange, theme, setTheme }: SettingsModalPro
           </Button>
           {isAdmin && (
             <>
-              <Button
-                variant={activeTab === "evolution" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setActiveTab("evolution")}
-              >
-                <Server className="h-4 w-4 mr-2" />
-                Evolution API
-              </Button>
               <Button
                 variant={activeTab === "ai" ? "default" : "ghost"}
                 size="sm"
@@ -172,66 +156,6 @@ const SettingsModal = ({ open, onOpenChange, theme, setTheme }: SettingsModalPro
                     </p>
                   </div>
                 )}
-                
-                <div className="flex justify-end gap-3">
-                  <Button variant="outline" onClick={() => onOpenChange(false)}>
-                    Cancelar
-                  </Button>
-                  <Button onClick={handleSave} disabled={loading}>
-                    <Save className="h-4 w-4 mr-2" />
-                    {loading ? "Salvando..." : "Salvar"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Configurações Evolution API */}
-          {activeTab === "evolution" && isAdmin && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Server className="h-5 w-5" />
-                  Evolution API
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="bg-blue-50 p-3 rounded-lg mb-4">
-                  <p className="text-sm text-blue-800">
-                    Configure sua própria Evolution API ou use a nossa. Para usar sua própria API, 
-                    preencha os campos abaixo com suas credenciais.
-                  </p>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="api-url">URL da API</Label>
-                  <Input
-                    id="api-url"
-                    placeholder="https://api.ramelseg.com.br"
-                    value={apiUrl}
-                    onChange={(e) => setApiUrl(e.target.value)}
-                  />
-                  <p className="text-sm text-gray-500">
-                    URL base da Evolution API (deixe vazio para usar nossa API padrão)
-                  </p>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="api-key" className="flex items-center gap-2">
-                    <Key className="h-4 w-4" />
-                    API Key
-                  </Label>
-                  <Input
-                    id="api-key"
-                    type="password"
-                    placeholder="Sua chave da API"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                  />
-                  <p className="text-sm text-gray-500">
-                    Chave de autenticação para acessar a Evolution API
-                  </p>
-                </div>
                 
                 <div className="flex justify-end gap-3">
                   <Button variant="outline" onClick={() => onOpenChange(false)}>

@@ -6,6 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Credenciais padrão da Evolution API
+const EVOLUTION_API_URL = 'https://api.ramelseg.com.br';
+const EVOLUTION_API_KEY = 'd86920ba398e31464c46401214779885';
 const MESSAGES_PER_RUN = 10 // Quantas mensagens enviar por execução
 
 serve(async (req) => {
@@ -19,15 +22,13 @@ serve(async (req) => {
   )
 
   try {
-    let evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
-    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
-
-    if (!evolutionApiUrl || !evolutionApiKey) {
-      console.error('Evolution API URL or Key not configured in secrets.');
-      throw new Error('Configuração da Evolution API não encontrada nos segredos do projeto.');
+    if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
+      console.error('Evolution API URL or Key not configured.');
+      throw new Error('Configuração da Evolution API não encontrada.');
     }
 
     // Sanitize URL to remove trailing slash
+    let evolutionApiUrl = EVOLUTION_API_URL;
     if (evolutionApiUrl.endsWith('/')) {
       evolutionApiUrl = evolutionApiUrl.slice(0, -1);
     }
@@ -75,7 +76,7 @@ serve(async (req) => {
 
         let response;
         let responseData;
-        const headers = { 'Content-Type': 'application/json', 'apikey': evolutionApiKey };
+        const headers = { 'Content-Type': 'application/json', 'apikey': EVOLUTION_API_KEY };
 
         if (msg.media_url) {
           const url = `${evolutionApiUrl}/message/sendMedia/${campaign.instance.instance_name}`;
