@@ -210,24 +210,38 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     setStartingCampaign(campaignId);
 
     try {
-      const { error } = await supabase
+      // Primeiro, marca como 'scheduled' para o RPC encontrar
+      const { error: updateError } = await supabase
         .from('campaigns')
         .update({ status: 'scheduled' })
         .eq('id', campaignId);
 
-      if (error) throw new Error("Erro ao agendar campanha.");
+      if (updateError) throw new Error("Erro ao agendar campanha.");
 
+      // Agora, chama o RPC para enfileirar as mensagens
+      const { data: rpcData, error: rpcError } = await supabase.rpc('queue_and_activate_campaign', {
+        campaign_id_param: campaignId,
+      });
+
+      if (rpcError) throw new Error(`Erro ao enfileirar mensagens: ${rpcError.message}`);
+
+      // Atualiza o status na UI para o status final (active ou completed)
+      const finalStatus = rpcData.includes('completed') ? 'completed' : 'active';
       setCampaigns(prev => 
-        prev.map(c => c.id === campaignId ? { ...c, status: 'scheduled' } : c)
+        prev.map(c => c.id === campaignId ? { ...c, status: finalStatus } : c)
       );
 
-      sonner.success("Campanha agendada!", { 
-        description: "O sistema iniciará o envio no horário programado. Certifique-se que o agendador (pg_cron) está ativo."
+      sonner.success("Campanha ativada com sucesso!", { 
+        description: "As mensagens foram enfileiradas e serão enviadas em breve pelo sistema."
       });
 
     } catch (error: any) {
       console.error('Error starting campaign:', error);
-      sonner.error("Erro ao agendar campanha", { description: error.message });
+      sonner.error("Erro ao iniciar campanha", { description: error.message });
+      // Reverte o status para 'draft' em caso de falha
+      setCampaigns(prev => 
+        prev.map(c => c.id === campaignId ? { ...c, status: 'draft' } : c)
+      );
     } finally {
       setStartingCampaign(null);
     }
