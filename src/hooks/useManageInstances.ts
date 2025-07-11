@@ -1,12 +1,9 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import {
   createInstance as createInstanceApi,
-  isApiConfigured,
-  getApiConfig,
   getQrCode,
   connectInstance,
   deleteInstance as deleteInstanceApi,
@@ -79,14 +76,6 @@ export function useManageInstances() {
       toast({
         title: "Erro",
         description: "Nome da instância é obrigatório",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (!isApiConfigured()) {
-      toast({
-        title: "Configuração faltando",
-        description: "Configure a URL da API e a API Key nas Configurações.",
         variant: "destructive",
       });
       return;
