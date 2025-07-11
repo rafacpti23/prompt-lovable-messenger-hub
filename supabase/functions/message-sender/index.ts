@@ -6,9 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const EVOLUTION_API_URL = Deno.env.get('EVOLUTION_API_URL')
-const EVOLUTION_API_KEY = Deno.env.get('EVOLUTION_API_KEY')
-const MESSAGES_PER_RUN = 5 // Quantas mensagens enviar por execução para não estourar o tempo
+const MESSAGES_PER_RUN = 10 // Quantas mensagens enviar por execução
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -21,11 +19,19 @@ serve(async (req) => {
   )
 
   try {
-    if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
-      throw new Error('Configuração da Evolution API não encontrada')
+    let evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
+    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
+
+    if (!evolutionApiUrl || !evolutionApiKey) {
+      console.error('Evolution API URL or Key not configured in secrets.');
+      throw new Error('Configuração da Evolution API não encontrada nos segredos do projeto.');
     }
 
-    // 1. Buscar um lote de mensagens pendentes da fila
+    // Sanitize URL to remove trailing slash
+    if (evolutionApiUrl.endsWith('/')) {
+      evolutionApiUrl = evolutionApiUrl.slice(0, -1);
+    }
+
     const { data: messages, error: fetchError } = await supabaseClient
       .from('scheduled_messages')
       .select(`
@@ -49,7 +55,6 @@ serve(async (req) => {
     }
 
     let sentCount = 0
-    // 2. Enviar cada mensagem do lote
     for (const msg of messages) {
       const { campaign } = msg
       if (!campaign || !campaign.instance) {
@@ -58,64 +63,51 @@ serve(async (req) => {
       }
 
       try {
-        // Verificar créditos do usuário antes de cada envio
         const { data: canSend, error: rpcError } = await supabaseClient.rpc('decrement_user_credits', { user_id_param: campaign.user_id })
         if (rpcError || !canSend) {
           await supabaseClient.from('scheduled_messages').update({ status: 'failed', response: { error: 'Créditos insuficientes ou erro ao decrementar.' } }).eq('id', msg.id)
-          continue // Pula para a próxima mensagem
+          continue
         }
 
-        // Substituir variáveis
         const personalizedMessage = msg.message
           .replace(/{{nome}}/g, msg.contact?.name || '')
           .replace(/{{telefone}}/g, msg.phone || '')
 
+        let response;
         let responseData;
-        
-        // Enviar mídia ou texto
+        const headers = { 'Content-Type': 'application/json', 'apikey': evolutionApiKey };
+
         if (msg.media_url) {
-            const mediaType = msg.media_url.match(/\.(mp4|mov|avi)$/i) ? 'video' : 'image';
-            const url = `${EVOLUTION_API_URL}/message/sendMedia/${campaign.instance.instance_name}`;
-            const body = {
-                number: msg.phone,
-                mediaMessage: {
-                    mediaType: mediaType,
-                    url: msg.media_url,
-                    caption: personalizedMessage
-                }
-            };
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_API_KEY },
-                body: JSON.stringify(body)
-            });
-            responseData = await response.json();
-            if (!response.ok) throw new Error(responseData.message || 'Erro na API Evolution ao enviar mídia');
+          const url = `${evolutionApiUrl}/message/sendMedia/${campaign.instance.instance_name}`;
+          const mediaType = msg.media_url.match(/\.(mp4|mov|avi)$/i) ? 'video' : 'image';
+          const body = { number: msg.phone, mediaMessage: { mediaType, url: msg.media_url, caption: personalizedMessage } };
+          response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
         } else {
-            const url = `${EVOLUTION_API_URL}/message/sendText/${campaign.instance.instance_name}`;
-            const body = {
-                number: msg.phone,
-                textMessage: { text: personalizedMessage }
-            };
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_API_KEY },
-                body: JSON.stringify(body)
-            });
-            responseData = await response.json();
-            if (!response.ok) throw new Error(responseData.message || 'Erro na API Evolution ao enviar texto');
+          const url = `${evolutionApiUrl}/message/sendText/${campaign.instance.instance_name}`;
+          const body = { number: msg.phone, textMessage: { text: personalizedMessage } };
+          response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
         }
 
-        // Atualizar status da mensagem para 'sent'
+        if (!response.ok) {
+          const errorText = await response.text();
+          let errorJson;
+          try {
+            errorJson = JSON.parse(errorText);
+          } catch {
+            errorJson = { message: errorText };
+          }
+          console.error(`Evolution API error for message ${msg.id}:`, errorJson);
+          throw new Error(errorJson.message || `HTTP error! status: ${response.status}`);
+        }
+
+        responseData = await response.json();
         await supabaseClient.from('scheduled_messages').update({ status: 'sent', sent_at: new Date().toISOString(), response: responseData }).eq('id', msg.id)
         sentCount++
 
       } catch (e) {
-        // Se falhar, atualiza o status para 'failed'
         await supabaseClient.from('scheduled_messages').update({ status: 'failed', response: { error: e.message } }).eq('id', msg.id)
       }
 
-      // Pausa entre mensagens, se configurado
       if (campaign.pause_between_messages > 0) {
         await new Promise(resolve => setTimeout(resolve, campaign.pause_between_messages * 1000))
       }

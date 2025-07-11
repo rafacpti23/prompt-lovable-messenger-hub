@@ -1,11 +1,11 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Play, Trash2 } from "lucide-react";
+import { Play, Trash2, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Campaign {
-  id: string; // Correction: string for UUID
+  id: string;
   name: string;
   message: string;
   status: string;
@@ -20,6 +20,7 @@ interface CampaignListProps {
   getStatusColor: (status: string) => string;
   getStatusText: (status: string) => string;
   onStartCampaign?: (id: string) => void;
+  onShowDetails: (id: string) => void;
 }
 
 const CampaignList: React.FC<CampaignListProps> = ({
@@ -28,6 +29,7 @@ const CampaignList: React.FC<CampaignListProps> = ({
   getStatusColor,
   getStatusText,
   onStartCampaign,
+  onShowDetails,
 }) => {
   return (
     <div className="grid gap-4">
@@ -50,11 +52,19 @@ const CampaignList: React.FC<CampaignListProps> = ({
                 )}
               </div>
               <div className="flex items-center space-x-2">
-                {campaign.status === "draft" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onShowDetails(campaign.id)}
+                >
+                  <ListChecks className="h-4 w-4 mr-2" />
+                  Detalhes
+                </Button>
+                {campaign.status === "draft" && onStartCampaign && (
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => onStartCampaign?.(campaign.id)}
+                    onClick={() => onStartCampaign(campaign.id)}
                   >
                     <Play className="h-4 w-4 mr-2" />
                     Iniciar

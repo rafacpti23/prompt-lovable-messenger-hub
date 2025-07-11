@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, AlertTriangle, Loader2 } from "lucide-react";
+import { Plus, AlertTriangle, Loader2, ListChecks } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import CampaignForm from "./CampaignForm";
 import CampaignList from "./CampaignList";
+import CampaignDetailsModal from "./CampaignDetailsModal";
 import { useBilling } from "@/hooks/useBilling";
 import { useCampaignList } from "@/hooks/useCampaignList";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +24,8 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
   const { toast } = useToast();
   const { campaigns, setCampaigns } = useCampaignList(toast);
   const { user } = useAuth();
+
+  const [detailsModal, setDetailsModal] = useState<{open: boolean, campaignId: string | null}>({ open: false, campaignId: null });
 
   // Estados para o formulário
   const [newCampaign, setNewCampaign] = useState({ name: "", message: "" });
@@ -274,6 +277,8 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
             <CampaignForm 
               newCampaign={newCampaign}
               setNewCampaign={setNewCampaign}
+              mediaUrl={mediaUrl}
+              setMediaUrl={setMediaUrl}
               contactSource={contactSource}
               setContactSource={setContactSource}
               googleConnected={googleConnected}
@@ -336,6 +341,13 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         getStatusColor={getStatusColor}
         getStatusText={getStatusText}
         onStartCampaign={onStartCampaign}
+        onShowDetails={(id) => setDetailsModal({ open: true, campaignId: id })}
+      />
+
+      <CampaignDetailsModal
+        campaignId={detailsModal.campaignId}
+        open={detailsModal.open}
+        onOpenChange={(open) => setDetailsModal({ ...detailsModal, open })}
       />
     </div>
   );
