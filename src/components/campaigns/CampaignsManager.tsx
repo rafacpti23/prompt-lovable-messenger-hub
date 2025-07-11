@@ -57,6 +57,8 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     setNewCampaign({ name: "", message: "" });
     setSelectedGroup("");
     setSelectedInstanceId("");
+    setScheduleDate("");
+    setScheduleTime("");
   };
 
   const handleConnectGoogle = () => {
@@ -75,6 +77,28 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       return;
     }
 
+    // Validar data/hora do agendamento
+    let scheduledForISO: string | null = null;
+    if (scheduleDate && scheduleTime) {
+      const scheduledDateTime = new Date(`${scheduleDate}T${scheduleTime}`);
+      if (scheduledDateTime < new Date()) {
+        toast({
+          title: "Erro de Agendamento",
+          description: "A data e hora do agendamento não podem ser no passado.",
+          variant: "destructive",
+        });
+        return;
+      }
+      scheduledForISO = scheduledDateTime.toISOString();
+    } else {
+        toast({
+          title: "Erro de Agendamento",
+          description: "Por favor, defina a data e hora para o envio.",
+          variant: "destructive",
+        });
+        return;
+    }
+
     try {
       // Buscar contatos para o grupo selecionado
       const { data: contacts, error: contactsError } = await supabase
@@ -83,13 +107,11 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         .eq('user_id', user.id)
         .contains('tags', [selectedGroup]);
 
-      if (contactsError) {
-        throw new Error("Erro ao buscar contatos do grupo.");
-      }
+      if (contactsError) throw new Error("Erro ao buscar contatos do grupo.");
       if (!contacts || contacts.length === 0) {
         toast({
           title: "Grupo vazio",
-          description: `Nenhum contato encontrado no grupo "${selectedGroup}". Adicione contatos ao grupo antes de criar a campanha.`,
+          description: `Nenhum contato encontrado no grupo "${selectedGroup}".`,
           variant: "destructive",
         });
         return;
@@ -105,7 +127,8 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
           name: newCampaign.name,
           message: newCampaign.message,
           contact_ids: contactIds,
-          status: "draft"
+          status: "draft",
+          scheduled_for: scheduledForISO
         })
         .select()
         .single();
@@ -114,7 +137,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
 
       toast({
         title: "Sucesso",
-        description: "Campanha criada com sucesso!",
+        description: "Campanha criada com sucesso! Ela será enviada no horário agendado.",
       });
 
       handleCampaignCreated();
@@ -187,40 +210,24 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     setStartingCampaign(campaignId);
 
     try {
-      // 1. Atualizar status da campanha para "scheduled"
-      const { error: updateError } = await supabase
+      const { error } = await supabase
         .from('campaigns')
         .update({ status: 'scheduled' })
         .eq('id', campaignId);
 
-      if (updateError) throw new Error("Erro ao agendar campanha.");
+      if (error) throw new Error("Erro ao agendar campanha.");
 
-      // 2. Chamar a edge function para disparar
-      sonner.info("Iniciando envio da campanha...");
-      const { data: functionData, error: functionError } = await supabase.functions.invoke('campaign-dispatcher', {
-        body: { campaignId: campaignId }
-      });
-
-      if (functionError) throw new Error(functionError.message);
-      if (!functionData?.success) throw new Error(functionData?.error || 'Erro desconhecido no disparo.');
-
-      sonner.success(`Campanha processada! ${functionData.successCount} mensagens enviadas.`);
-      
-      // Atualizar o estado local
       setCampaigns(prev => 
-        prev.map(c => {
-          if (c.id === campaignId) {
-            const campaignToUpdate = campaigns.find(camp => camp.id === campaignId);
-            const totalContacts = campaignToUpdate?.total || 0;
-            return { ...c, status: "sent", sent: functionData.successCount, total: totalContacts };
-          }
-          return c;
-        })
+        prev.map(c => c.id === campaignId ? { ...c, status: 'scheduled' } : c)
       );
+
+      sonner.success("Campanha agendada!", { 
+        description: "O sistema iniciará o envio no horário programado. Certifique-se que o agendador (pg_cron) está ativo."
+      });
 
     } catch (error: any) {
       console.error('Error starting campaign:', error);
-      sonner.error("Erro ao iniciar campanha", { description: error.message });
+      sonner.error("Erro ao agendar campanha", { description: error.message });
     } finally {
       setStartingCampaign(null);
     }
