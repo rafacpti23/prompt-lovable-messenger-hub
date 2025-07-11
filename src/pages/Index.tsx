@@ -131,10 +131,10 @@ const MainApp = () => {
                 <div className="flex items-center space-x-2">
                   <img 
                     src="/lovable-uploads/c9bbdaa6-c367-4489-8438-ef65ccaf62f2.png" 
-                    alt="WhatsApp Pro Logo" 
-                    className="h-8 w-8"
+                    alt="WhatsPro Logo" 
+                    className="h-10 w-10"
                   />
-                  <h1 className="text-2xl font-bold text-foreground">WhatsApp Pro</h1>
+                  <h1 className="text-2xl font-bold text-foreground">WhatsPro</h1>
                 </div>
               </div>
               <div className="flex items-center space-x-4">
