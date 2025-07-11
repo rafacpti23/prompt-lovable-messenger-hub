@@ -50,6 +50,11 @@ serve(async (req) => {
 
     if (fetchError) throw new Error(`Erro ao buscar mensagens: ${fetchError.message}`)
     if (!messages || messages.length === 0) {
+      // Mesmo sem mensagens, vamos verificar se alguma campanha antiga pode ser completada
+      const { error: updateError } = await supabaseClient.rpc('update_completed_campaigns');
+      if (updateError) {
+        console.error('Error updating completed campaigns status (no pending messages):', updateError.message);
+      }
       return new Response(JSON.stringify({ message: 'Nenhuma mensagem pendente para enviar.' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
@@ -84,7 +89,6 @@ serve(async (req) => {
           response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
         } else {
           const url = `${evolutionApiUrl}/message/sendText/${campaign.instance.instance_name}`;
-          // CORREÇÃO APLICADA AQUI
           const body = { number: msg.phone, text: personalizedMessage };
           response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
         }
@@ -112,6 +116,14 @@ serve(async (req) => {
       if (campaign.pause_between_messages > 0) {
         await new Promise(resolve => setTimeout(resolve, campaign.pause_between_messages * 1000))
       }
+    }
+
+    // **CORREÇÃO APLICADA AQUI**
+    // Após processar o lote de mensagens, verifica e atualiza o status das campanhas concluídas.
+    const { error: updateError } = await supabaseClient.rpc('update_completed_campaigns');
+    if (updateError) {
+        // Loga o erro mas não falha a função inteira, pois o envio das mensagens pode ter sido um sucesso.
+        console.error('Error updating completed campaigns status:', updateError.message);
     }
 
     return new Response(JSON.stringify({ message: `${sentCount} de ${messages.length} mensagens processadas.` }), {
