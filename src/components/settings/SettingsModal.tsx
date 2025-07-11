@@ -45,8 +45,8 @@ const SettingsModal = ({ open, onOpenChange, theme, setTheme }: SettingsModalPro
       // Salvar configurações gerais
       localStorage.setItem('message_interval', messageInterval);
       
-      // Salvar configurações da API Evolution para todos os usuários
-      if (apiUrl && apiKey) {
+      // Salvar configurações da API Evolution para todos os usuários (só admin pode fazer isso)
+      if (isAdmin) {
         localStorage.setItem('evolution_api_url', apiUrl);
         localStorage.setItem('evolution_api_key', apiKey);
       }
@@ -88,24 +88,24 @@ const SettingsModal = ({ open, onOpenChange, theme, setTheme }: SettingsModalPro
             <Clock className="h-4 w-4 mr-2" />
             Geral
           </Button>
-          <Button
-            variant={activeTab === "evolution" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setActiveTab("evolution")}
-          >
-            <Server className="h-4 w-4 mr-2" />
-            Evolution API
-          </Button>
-          <Button
-            variant={activeTab === "ai" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setActiveTab("ai")}
-          >
-            <Brain className="h-4 w-4 mr-2" />
-            IA
-          </Button>
           {isAdmin && (
             <>
+              <Button
+                variant={activeTab === "evolution" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setActiveTab("evolution")}
+              >
+                <Server className="h-4 w-4 mr-2" />
+                Evolution API
+              </Button>
+              <Button
+                variant={activeTab === "ai" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setActiveTab("ai")}
+              >
+                <Brain className="h-4 w-4 mr-2" />
+                IA
+              </Button>
               <Button
                 variant={activeTab === "users" ? "default" : "ghost"}
                 size="sm"
@@ -187,7 +187,7 @@ const SettingsModal = ({ open, onOpenChange, theme, setTheme }: SettingsModalPro
           )}
 
           {/* Configurações Evolution API */}
-          {activeTab === "evolution" && (
+          {activeTab === "evolution" && isAdmin && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -257,7 +257,7 @@ const SettingsModal = ({ open, onOpenChange, theme, setTheme }: SettingsModalPro
           )}
 
           {/* Configurações de IA */}
-          {activeTab === "ai" && (
+          {activeTab === "ai" && isAdmin && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
