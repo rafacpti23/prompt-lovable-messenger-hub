@@ -1,15 +1,15 @@
-
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Eye, Upload, X, Image } from "lucide-react";
+import { Plus, Eye, Upload, X, Image, Brain } from "lucide-react";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import MessagePreview from "./MessagePreview";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import MediaRepository from "@/components/media/MediaRepository";
+import AiMessageGenerator from "./AiMessageGenerator";
 
 interface Instance {
   id: string;
@@ -325,9 +325,14 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
 
           {/* Mensagem/Caption */}
           <div>
-            <label className="block font-medium mb-2">
-              {messageType === "text" ? "Mensagem da campanha: *" : "Legenda (opcional):"}
-            </label>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block font-medium">
+                {messageType === "text" ? "Mensagem da campanha: *" : "Legenda (opcional):"}
+              </label>
+              <AiMessageGenerator 
+                onMessageGenerated={(message) => setNewCampaign({ ...newCampaign, message })}
+              />
+            </div>
             <div className="space-y-2">
               <div className="flex gap-2 flex-wrap">
                 <Button

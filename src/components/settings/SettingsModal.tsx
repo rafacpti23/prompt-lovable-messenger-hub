@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -26,8 +25,6 @@ const SettingsModal = ({ open, onOpenChange, theme, setTheme }: SettingsModalPro
   const [apiUrl, setApiUrl] = useState(localStorage.getItem('evolution_api_url') || '');
   const [apiKey, setApiKey] = useState(localStorage.getItem('evolution_api_key') || '');
   const [messageInterval, setMessageInterval] = useState(localStorage.getItem('message_interval') || '5');
-  const [groqApiKey, setGroqApiKey] = useState(localStorage.getItem('groq_api_key') || '');
-  const [geminiApiKey, setGeminiApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
   const [loading, setSaving] = useState(false);
 
   // Verifica se é o usuário administrador
@@ -52,14 +49,6 @@ const SettingsModal = ({ open, onOpenChange, theme, setTheme }: SettingsModalPro
       if (apiUrl && apiKey) {
         localStorage.setItem('evolution_api_url', apiUrl);
         localStorage.setItem('evolution_api_key', apiKey);
-      }
-      
-      // Salvar configurações da IA
-      if (groqApiKey) {
-        localStorage.setItem('groq_api_key', groqApiKey);
-      }
-      if (geminiApiKey) {
-        localStorage.setItem('gemini_api_key', geminiApiKey);
       }
       
       toast({
@@ -107,6 +96,14 @@ const SettingsModal = ({ open, onOpenChange, theme, setTheme }: SettingsModalPro
             <Server className="h-4 w-4 mr-2" />
             Evolution API
           </Button>
+          <Button
+            variant={activeTab === "ai" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setActiveTab("ai")}
+          >
+            <Brain className="h-4 w-4 mr-2" />
+            IA
+          </Button>
           {isAdmin && (
             <>
               <Button
@@ -124,14 +121,6 @@ const SettingsModal = ({ open, onOpenChange, theme, setTheme }: SettingsModalPro
               >
                 <CreditCard className="h-4 w-4 mr-2" />
                 Planos
-              </Button>
-              <Button
-                variant={activeTab === "ai" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setActiveTab("ai")}
-              >
-                <Brain className="h-4 w-4 mr-2" />
-                IA
               </Button>
             </>
           )}
@@ -279,52 +268,36 @@ const SettingsModal = ({ open, onOpenChange, theme, setTheme }: SettingsModalPro
               <CardContent className="space-y-4">
                 <div className="bg-blue-50 dark:bg-blue-950/50 p-3 rounded-lg mb-4">
                   <p className="text-sm text-blue-800 dark:text-blue-200">
-                    Configure as APIs de IA para geração automática de mensagens personalizadas, 
-                    análise de sentimento e otimização de campanhas.
+                    Para usar os recursos de IA, você precisa configurar suas chaves de API como segredos no seu projeto Supabase.
                   </p>
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="groq-api-key" className="flex items-center gap-2">
+                <div className="space-y-2 border p-3 rounded-lg">
+                  <Label className="flex items-center gap-2 font-semibold">
                     <Key className="h-4 w-4" />
-                    API Key Groq
+                    API Key Groq (Obrigatório)
                   </Label>
-                  <Input
-                    id="groq-api-key"
-                    type="password"
-                    placeholder="Sua chave da API Groq"
-                    value={groqApiKey}
-                    onChange={(e) => setGroqApiKey(e.target.value)}
-                  />
                   <p className="text-sm text-muted-foreground">
-                    API rápida e eficiente para geração de mensagens personalizadas
+                    Para gerar mensagens de campanha, adicione um segredo chamado <code className="font-mono bg-muted px-1 py-0.5 rounded">groq_api_key</code> no seu projeto Supabase.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Vá para: Project Settings &gt; Edge Functions &gt; Add new secret.
                   </p>
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="gemini-api-key" className="flex items-center gap-2">
+                <div className="space-y-2 border p-3 rounded-lg">
+                  <Label className="flex items-center gap-2 font-semibold">
                     <Key className="h-4 w-4" />
-                    API Key Google Gemini
+                    API Key Google Gemini (Opcional)
                   </Label>
-                  <Input
-                    id="gemini-api-key"
-                    type="password"
-                    placeholder="Sua chave da API Gemini"
-                    value={geminiApiKey}
-                    onChange={(e) => setGeminiApiKey(e.target.value)}
-                  />
                   <p className="text-sm text-muted-foreground">
-                    API avançada do Google para análise de sentimento e conteúdo
+                    Funcionalidades futuras de IA podem usar a API do Gemini. Você pode configurar um segredo chamado <code className="font-mono bg-muted px-1 py-0.5 rounded">gemini_api_key</code>.
                   </p>
                 </div>
                 
                 <div className="flex justify-end gap-3">
                   <Button variant="outline" onClick={() => onOpenChange(false)}>
-                    Cancelar
-                  </Button>
-                  <Button onClick={handleSave} disabled={loading}>
-                    <Save className="h-4 w-4 mr-2" />
-                    {loading ? "Salvando..." : "Salvar"}
+                    Fechar
                   </Button>
                 </div>
               </CardContent>
