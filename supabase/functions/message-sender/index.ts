@@ -30,7 +30,7 @@ serve(async (req) => {
     const evolutionApiUrl = EVOLUTION_API_URL.endsWith('/') ? EVOLUTION_API_URL.slice(0, -1) : EVOLUTION_API_URL;
     console.log("Evolution API URL:", evolutionApiUrl);
 
-    // Buscar mensagens pendentes diretamente, sem usar a função RPC que pode estar com problemas
+    // Buscar mensagens pendentes
     const { data: pendingMessages, error: pendingError } = await supabaseClient
       .from('scheduled_messages')
       .select('id')
@@ -52,22 +52,11 @@ serve(async (req) => {
     console.log(`Found ${pendingMessages.length} pending messages`);
     const messageIds = pendingMessages.map(m => m.id);
 
-    // Marcar mensagens como "sending" para evitar processamento duplicado
-    const { error: updateError } = await supabaseClient
-      .from('scheduled_messages')
-      .update({ status: 'sending' })
-      .in('id', messageIds);
-
-    if (updateError) {
-      console.error("Error updating message status to sending:", updateError);
-      throw new Error(`Error updating message status: ${updateError.message}`);
-    }
-
-    // Buscar detalhes completos das mensagens
+    // Buscar detalhes completos das mensagens SEM alterar o status ainda
     const { data: messages, error: fetchError } = await supabaseClient
       .from('scheduled_messages')
       .select(`
-        id, phone, message, media_url, campaign_id, contact_id, scheduled_for,
+        id, phone, message, media_url, campaign_id, contact_id, scheduled_for, status,
         contact:contacts(name),
         campaign:campaigns(
           user_id, instance_id, status, pause_between_messages,
@@ -180,21 +169,30 @@ serve(async (req) => {
       } catch (e) {
         console.error(`Error sending message ${msg.id}:`, e);
         responseData = { error: e.message };
+        finalStatus = 'failed';
       }
 
-      // Atualizar status da mensagem
+      // Atualizar status da mensagem - usando apenas valores válidos
       console.log(`Updating message ${msg.id} status to: ${finalStatus}`);
-      await supabaseClient
+      const updateData: any = { status: finalStatus };
+      
+      if (finalStatus === 'sent') {
+        updateData.sent_at = new Date().toISOString();
+      }
+
+      const { error: updateError } = await supabaseClient
         .from('scheduled_messages')
-        .update({ 
-          status: finalStatus, 
-          sent_at: finalStatus === 'sent' ? new Date().toISOString() : null 
-        })
+        .update(updateData)
         .eq('id', msg.id);
+
+      if (updateError) {
+        console.error(`Error updating message ${msg.id}:`, updateError);
+        // Continuar processando outras mensagens mesmo se uma falhar na atualização
+      }
 
       // Registrar no log de mensagens
       console.log(`Adding message to log`);
-      await supabaseClient.from('messages_log').insert({
+      const { error: logError } = await supabaseClient.from('messages_log').insert({
           campaign_id: msg.campaign_id,
           contact_id: msg.contact_id,
           phone: msg.phone,
@@ -204,6 +202,10 @@ serve(async (req) => {
           scheduled_for: msg.scheduled_for,
           user_id: campaign.user_id
       });
+
+      if (logError) {
+        console.error(`Error logging message ${msg.id}:`, logError);
+      }
 
       // Pausa entre mensagens
       const pauseDuration = campaign.pause_between_messages || 5;
@@ -216,7 +218,8 @@ serve(async (req) => {
     console.log(`Completed processing. Sent ${sentCount} of ${messages.length} messages.`);
     return new Response(
       JSON.stringify({ 
-        message: `${sentCount} de ${messages.length} mensagens processadas.` 
+        message: `${sentCount} de ${messages.length} mensagens processadas com sucesso.`,
+        success: true
       }), 
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -226,9 +229,12 @@ serve(async (req) => {
   } catch (error) {
     console.error('Erro no message-sender:', error);
     return new Response(
-      JSON.stringify({ error: error.message }), 
+      JSON.stringify({ 
+        error: error.message,
+        success: false
+      }), 
       { 
-        status: 200, // Mudando para 200 para evitar erros de Edge Function
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
