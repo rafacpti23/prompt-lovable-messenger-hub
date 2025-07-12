@@ -21,30 +21,6 @@ serve(async (req) => {
   )
 
   try {
-    // --- Start of Combined Dispatcher Logic ---
-    const { data: scheduledCampaigns, error: fetchCampaignsError } = await supabaseClient
-      .from('campaigns')
-      .select('id')
-      .eq('status', 'scheduled')
-      .lte('scheduled_for', new Date().toISOString());
-
-    if (fetchCampaignsError) {
-      console.error(`Error fetching scheduled campaigns: ${fetchCampaignsError.message}`);
-    }
-
-    if (scheduledCampaigns && scheduledCampaigns.length > 0) {
-      for (const campaign of scheduledCampaigns) {
-        const { error: rpcError } = await supabaseClient.rpc('queue_and_activate_campaign', {
-          campaign_id_param: campaign.id,
-        });
-        if (rpcError) {
-          console.error(`Error queuing campaign ${campaign.id}:`, rpcError.message);
-          await supabaseClient.from('campaigns').update({ status: 'failed' }).eq('id', campaign.id);
-        }
-      }
-    }
-    // --- End of Combined Dispatcher Logic ---
-
     if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
       throw new Error('Configuração da Evolution API não encontrada.');
     }
