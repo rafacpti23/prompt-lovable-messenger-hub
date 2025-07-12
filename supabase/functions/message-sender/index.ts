@@ -10,6 +10,9 @@ const EVOLUTION_API_URL = 'https://api.ramelseg.com.br';
 const EVOLUTION_API_KEY = 'd86920ba398e31464c46401214779885';
 const MESSAGES_PER_RUN = 4;
 
+// Definir os status válidos para envio de mensagens
+const VALID_CAMPAIGN_STATUSES = ['draft', 'scheduled', 'sending'];
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -95,8 +98,8 @@ serve(async (req) => {
           throw new Error('Dados da campanha ou instância ausentes.');
         }
 
-        // Verificar se a campanha ainda está em um estado válido para envio
-        if (!['draft', 'scheduled', 'sending'].includes(campaign.status)) {
+        // Verificar se a campanha está em um status válido para envio
+        if (!VALID_CAMPAIGN_STATUSES.includes(campaign.status)) {
           console.log(`Campaign ${campaign.id} is not in a valid status for sending: ${campaign.status}`);
           continue;
         }
