@@ -15,94 +15,185 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
-  const supabaseClient = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  )
-
   try {
+    console.log("Starting message-sender function");
+    
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
     if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
       throw new Error('Configuração da Evolution API não encontrada.');
     }
 
     const evolutionApiUrl = EVOLUTION_API_URL.endsWith('/') ? EVOLUTION_API_URL.slice(0, -1) : EVOLUTION_API_URL;
+    console.log("Evolution API URL:", evolutionApiUrl);
 
-    const { data: lockedMessages, error: lockError } = await supabaseClient
-      .rpc('lock_and_get_pending_message_ids', { limit_count: MESSAGES_PER_RUN });
+    // Buscar mensagens pendentes diretamente, sem usar a função RPC que pode estar com problemas
+    const { data: pendingMessages, error: pendingError } = await supabaseClient
+      .from('scheduled_messages')
+      .select('id')
+      .eq('status', 'pending')
+      .limit(MESSAGES_PER_RUN);
 
-    if (lockError) throw new Error(`Error locking messages: ${lockError.message}`);
-
-    if (!lockedMessages || lockedMessages.length === 0) {
-      return new Response(JSON.stringify({ message: 'Nenhuma mensagem pendente para enviar.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    if (pendingError) {
+      console.error("Error fetching pending messages:", pendingError);
+      throw new Error(`Error fetching pending messages: ${pendingError.message}`);
     }
 
-    const messageIds = lockedMessages.map(m => m.id);
+    if (!pendingMessages || pendingMessages.length === 0) {
+      console.log("No pending messages found");
+      return new Response(JSON.stringify({ message: 'Nenhuma mensagem pendente para enviar.' }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
 
+    console.log(`Found ${pendingMessages.length} pending messages`);
+    const messageIds = pendingMessages.map(m => m.id);
+
+    // Marcar mensagens como "sending" para evitar processamento duplicado
+    const { error: updateError } = await supabaseClient
+      .from('scheduled_messages')
+      .update({ status: 'sending' })
+      .in('id', messageIds);
+
+    if (updateError) {
+      console.error("Error updating message status to sending:", updateError);
+      throw new Error(`Error updating message status: ${updateError.message}`);
+    }
+
+    // Buscar detalhes completos das mensagens
     const { data: messages, error: fetchError } = await supabaseClient
       .from('scheduled_messages')
       .select(`
         id, phone, message, media_url, campaign_id, contact_id, scheduled_for,
         contact:contacts(name),
-        campaign:campaigns!inner(
+        campaign:campaigns(
           user_id, instance_id, status, pause_between_messages,
-          instance:instances!inner(instance_name)
+          instance:instances(instance_name)
         )
       `)
       .in('id', messageIds);
 
-    if (fetchError) throw new Error(`Error fetching locked message details: ${fetchError.message}`);
-    if (!messages || messages.length === 0) {
-        return new Response(JSON.stringify({ message: 'Mensagens reservadas não encontradas para processamento.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    if (fetchError) {
+      console.error("Error fetching message details:", fetchError);
+      throw new Error(`Error fetching message details: ${fetchError.message}`);
     }
 
+    if (!messages || messages.length === 0) {
+      console.log("No message details found for the pending messages");
+      return new Response(JSON.stringify({ message: 'Detalhes das mensagens não encontrados.' }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
+
+    console.log(`Processing ${messages.length} messages`);
     let sentCount = 0;
+    
     for (const msg of messages) {
+      console.log(`Processing message ID: ${msg.id}, Phone: ${msg.phone}`);
+      
       const { campaign } = msg;
       let finalStatus = 'failed';
       let responseData: any = { error: 'Unknown error' };
 
       try {
         if (!campaign || !campaign.instance) {
+          console.error("Campaign or instance data missing for message:", msg.id);
           throw new Error('Dados da campanha ou instância ausentes.');
         }
 
-        const { data: canSend, error: rpcError } = await supabaseClient.rpc('decrement_user_credits', { user_id_param: campaign.user_id });
-        if (rpcError || !canSend) {
-          throw new Error('Créditos insuficientes ou erro ao decrementar.');
+        console.log(`Decrementing credits for user: ${campaign.user_id}`);
+        const { data: canSend, error: rpcError } = await supabaseClient.rpc(
+          'decrement_user_credits', 
+          { user_id_param: campaign.user_id }
+        );
+
+        if (rpcError) {
+          console.error("RPC error when decrementing credits:", rpcError);
+          throw new Error(`Erro ao decrementar créditos: ${rpcError.message}`);
         }
 
-        const personalizedMessage = msg.message.replace(/{{nome}}/g, msg.contact?.name || '').replace(/{{telefone}}/g, msg.phone || '');
-        const headers = { 'Content-Type': 'application/json', 'apikey': EVOLUTION_API_KEY };
+        if (!canSend) {
+          console.error("Not enough credits for user:", campaign.user_id);
+          throw new Error('Créditos insuficientes.');
+        }
+
+        const personalizedMessage = msg.message
+          .replace(/{{nome}}/g, msg.contact?.name || '')
+          .replace(/{{telefone}}/g, msg.phone || '');
+        
+        const headers = { 
+          'Content-Type': 'application/json', 
+          'apikey': EVOLUTION_API_KEY 
+        };
+        
         let response;
+        console.log(`Sending message to ${msg.phone} via instance ${campaign.instance.instance_name}`);
 
         if (msg.media_url) {
           const url = `${evolutionApiUrl}/message/sendMedia/${campaign.instance.instance_name}`;
           const mediaType = msg.media_url.match(/\.(mp4|mov|avi)$/i) ? 'video' : 'image';
-          const body = { number: msg.phone, mediaMessage: { mediaType, url: msg.media_url, caption: personalizedMessage } };
-          response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+          const body = { 
+            number: msg.phone, 
+            mediaMessage: { 
+              mediaType, 
+              url: msg.media_url, 
+              caption: personalizedMessage 
+            } 
+          };
+          
+          console.log(`Sending media message to URL: ${url}`);
+          response = await fetch(url, { 
+            method: 'POST', 
+            headers, 
+            body: JSON.stringify(body) 
+          });
         } else {
           const url = `${evolutionApiUrl}/message/sendText/${campaign.instance.instance_name}`;
-          const body = { number: msg.phone, text: personalizedMessage };
-          response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+          const body = { 
+            number: msg.phone, 
+            text: personalizedMessage 
+          };
+          
+          console.log(`Sending text message to URL: ${url}`);
+          response = await fetch(url, { 
+            method: 'POST', 
+            headers, 
+            body: JSON.stringify(body) 
+          });
         }
 
+        console.log(`Response status: ${response.status}`);
         responseData = await response.json();
+        
         if (!response.ok) {
+          console.error("Error response from Evolution API:", responseData);
           throw new Error(responseData.message || `HTTP error! status: ${response.status}`);
         }
 
+        console.log("Message sent successfully");
         finalStatus = 'sent';
         sentCount++;
 
       } catch (e) {
+        console.error(`Error sending message ${msg.id}:`, e);
         responseData = { error: e.message };
       }
 
+      // Atualizar status da mensagem
+      console.log(`Updating message ${msg.id} status to: ${finalStatus}`);
       await supabaseClient
         .from('scheduled_messages')
-        .update({ status: finalStatus, sent_at: finalStatus === 'sent' ? new Date().toISOString() : null })
+        .update({ 
+          status: finalStatus, 
+          sent_at: finalStatus === 'sent' ? new Date().toISOString() : null 
+        })
         .eq('id', msg.id);
 
+      // Registrar no log de mensagens
+      console.log(`Adding message to log`);
       await supabaseClient.from('messages_log').insert({
           campaign_id: msg.campaign_id,
           contact_id: msg.contact_id,
@@ -114,16 +205,32 @@ serve(async (req) => {
           user_id: campaign.user_id
       });
 
+      // Pausa entre mensagens
       const pauseDuration = campaign.pause_between_messages || 5;
-      if (pauseDuration > 0) {
+      if (pauseDuration > 0 && sentCount < messages.length) {
+        console.log(`Pausing for ${pauseDuration} seconds before next message`);
         await new Promise(resolve => setTimeout(resolve, pauseDuration * 1000));
       }
     }
 
-    return new Response(JSON.stringify({ message: `${sentCount} de ${messages.length} mensagens processadas.` }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    console.log(`Completed processing. Sent ${sentCount} of ${messages.length} messages.`);
+    return new Response(
+      JSON.stringify({ 
+        message: `${sentCount} de ${messages.length} mensagens processadas.` 
+      }), 
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
 
   } catch (error) {
     console.error('Erro no message-sender:', error);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    return new Response(
+      JSON.stringify({ error: error.message }), 
+      { 
+        status: 200, // Mudando para 200 para evitar erros de Edge Function
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
   }
 })

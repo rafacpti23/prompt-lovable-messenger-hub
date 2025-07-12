@@ -25,6 +25,23 @@ const Dashboard = () => {
     });
 
     try {
+      // Primeiro, verificar se há mensagens pendentes
+      const { count, error: countError } = await supabase
+        .from('scheduled_messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+      
+      if (countError) throw new Error(countError.message);
+      
+      if (count === 0) {
+        toast.info("Nenhuma mensagem pendente", {
+          description: "Não há mensagens na fila para envio."
+        });
+        setIsDispatching(false);
+        return;
+      }
+      
+      // Chamar a função de envio
       const { data, error } = await supabase.functions.invoke('message-sender');
 
       if (error) {
