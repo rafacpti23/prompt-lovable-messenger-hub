@@ -95,6 +95,12 @@ serve(async (req) => {
           throw new Error('Dados da campanha ou instância ausentes.');
         }
 
+        // Verificar se a campanha ainda está em um estado válido para envio
+        if (!['draft', 'scheduled', 'sending'].includes(campaign.status)) {
+          console.log(`Campaign ${campaign.id} is not in a valid status for sending: ${campaign.status}`);
+          continue;
+        }
+
         console.log(`Decrementing credits for user: ${campaign.user_id}`);
         const { data: canSend, error: rpcError } = await supabaseClient.rpc(
           'decrement_user_credits', 
