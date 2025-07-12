@@ -6,7 +6,7 @@ import CampaignForm from "./CampaignForm";
 import CampaignList from "./CampaignList";
 import CampaignDetailsModal from "./CampaignDetailsModal";
 import { useBilling } from "@/hooks/useBilling";
-import { useCampaigns } from "@/hooks/useCampaigns";
+import { useCampaigns } from "@/hooks/useCampaigns.tsx";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
