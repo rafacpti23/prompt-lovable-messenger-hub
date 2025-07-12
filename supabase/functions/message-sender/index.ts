@@ -6,10 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const EVOLUTION_API_URL = 'https://api.ramelseg.com.br';
-const EVOLUTION_API_KEY = 'd86920ba398e31464c46401214779885';
-const MESSAGES_PER_RUN = 5; // Processar 5 mensagens por vez
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -23,11 +19,19 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // Obter credenciais da Evolution API das variáveis de ambiente
+    const EVOLUTION_API_URL = Deno.env.get('EVOLUTION_API_URL');
+    const EVOLUTION_API_KEY = Deno.env.get('EVOLUTION_API_KEY');
+
     if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
-      throw new Error('Configuração da Evolution API não encontrada.');
+      console.error('Erro: Credenciais da Evolution API não configuradas nas variáveis de ambiente.');
+      throw new Error('Configuração da Evolution API não encontrada. Verifique EVOLUTION_API_URL e EVOLUTION_API_KEY.');
     }
 
+    const MESSAGES_PER_RUN = 5; // Processar 5 mensagens por vez
+
     // 1. Travar mensagens e obter seus IDs de forma atômica
+    console.log("Attempting to lock pending messages...");
     const { data: lockedMessages, error: lockError } = await supabaseClient.rpc(
       'lock_and_get_pending_message_ids',
       { limit_count: MESSAGES_PER_RUN }
@@ -49,6 +53,7 @@ serve(async (req) => {
     console.log(`Locked ${messageIds.length} messages for processing:`, messageIds);
 
     // 2. Buscar detalhes completos das mensagens já travadas
+    console.log("Fetching full message details...");
     const { data: messages, error: fetchError } = await supabaseClient
       .from('scheduled_messages')
       .select(`
@@ -85,9 +90,27 @@ serve(async (req) => {
         }
         if (campaign.status !== 'sending') {
             console.log(`Skipping message ${msg.id} because campaign ${campaign.id} is not in 'sending' status (current: ${campaign.status}).`);
+            // Se a campanha não está em 'sending', a mensagem não deveria ter sido travada.
+            // Isso pode indicar um problema na RPC 'lock_and_get_pending_message_ids' ou um status desatualizado.
+            // Para evitar que a mensagem fique presa em 'sending' na scheduled_messages, vamos marcá-la como 'failed'
+            // e registrar o motivo.
+            finalStatus = 'failed';
+            responseData = { error: `Campanha não está em status 'sending'. Status atual: ${campaign.status}` };
+            failedCount++;
+            // Atualizar o status da mensagem para 'failed' e registrar no log
+            await supabaseClient
+              .from('scheduled_messages')
+              .update({ status: finalStatus })
+              .eq('id', msg.id);
+            await supabaseClient.from('messages_log').insert({
+                campaign_id: msg.campaign_id, contact_id: msg.contact_id, phone: msg.phone,
+                message: msg.message, status: finalStatus, response: responseData,
+                scheduled_for: msg.scheduled_for, user_id: campaign.user_id
+            });
             continue; // Pula para a próxima mensagem
         }
 
+        console.log(`Decrementing credits for user: ${campaign.user_id}`);
         const { data: canSend, error: rpcError } = await supabaseClient.rpc(
           'decrement_user_credits', 
           { user_id_param: campaign.user_id }
@@ -95,48 +118,58 @@ serve(async (req) => {
 
         if (rpcError) throw new Error(`Erro ao decrementar créditos: ${rpcError.message}`);
         if (!canSend) throw new Error('Créditos insuficientes.');
+        console.log("Credits decremented successfully.");
 
         const personalizedMessage = msg.message.replace(/{{nome}}/g, msg.contact?.name || '').replace(/{{telefone}}/g, msg.phone || '');
         const headers = { 'Content-Type': 'application/json', 'apikey': EVOLUTION_API_KEY };
         
         let response;
+        let url;
+        let body;
+
         if (msg.media_url) {
-          const url = `${EVOLUTION_API_URL}/message/sendMedia/${campaign.instance.instance_name}`;
-          const body = { number: msg.phone, mediaMessage: { mediaType: msg.media_url.match(/\.(mp4|mov|avi)$/i) ? 'video' : 'image', url: msg.media_url, caption: personalizedMessage } };
+          url = `${EVOLUTION_API_URL}/message/sendMedia/${campaign.instance.instance_name}`;
+          body = { number: msg.phone, mediaMessage: { mediaType: msg.media_url.match(/\.(mp4|mov|avi)$/i) ? 'video' : 'image', url: msg.media_url, caption: personalizedMessage } };
+          console.log(`Sending media message to ${url} with body:`, JSON.stringify(body));
           response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
         } else {
-          const url = `${EVOLUTION_API_URL}/message/sendText/${campaign.instance.instance_name}`;
-          const body = { number: msg.phone, text: personalizedMessage };
+          url = `${EVOLUTION_API_URL}/message/sendText/${campaign.instance.instance_name}`;
+          body = { number: msg.phone, text: personalizedMessage };
+          console.log(`Sending text message to ${url} with body:`, JSON.stringify(body));
           response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
         }
 
         responseData = await response.json();
+        console.log("Evolution API response:", responseData);
         if (!response.ok) throw new Error(responseData.message || `HTTP error! status: ${response.status}`);
 
         finalStatus = 'sent';
         sentCount++;
 
-      } catch (e) {
-        console.error(`Error processing message ${msg.id}:`, e);
+      } catch (e: any) {
+        console.error(`Error processing message ${msg.id}:`, e.message);
         responseData = { error: e.message };
         failedCount++;
       }
 
       // 3. Atualizar o status final da mensagem (de 'sending' para 'sent' ou 'failed')
+      console.log(`Updating scheduled_message ${msg.id} to status: ${finalStatus}`);
       await supabaseClient
         .from('scheduled_messages')
         .update({ status: finalStatus, sent_at: finalStatus === 'sent' ? new Date().toISOString() : null })
         .eq('id', msg.id);
 
       // 4. Registrar no log
+      console.log(`Logging message ${msg.id} with status: ${finalStatus}`);
       await supabaseClient.from('messages_log').insert({
           campaign_id: msg.campaign_id, contact_id: msg.contact_id, phone: msg.phone,
           message: msg.message, status: finalStatus, response: responseData,
           scheduled_for: msg.scheduled_for, user_id: campaign.user_id
       });
 
-      const pauseDuration = campaign.pause_between_messages || 5;
+      const pauseDuration = campaign?.pause_between_messages || 5;
       if (pauseDuration > 0 && (sentCount + failedCount) < messages.length) {
+        console.log(`Pausing for ${pauseDuration} seconds before next message.`);
         await new Promise(resolve => setTimeout(resolve, pauseDuration * 1000));
       }
     }
@@ -146,8 +179,8 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     });
 
-  } catch (error) {
-    console.error('Erro fatal no message-sender:', error);
+  } catch (error: any) {
+    console.error('Erro fatal no message-sender:', error.message);
     return new Response(JSON.stringify({ error: error.message }), { 
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     });
