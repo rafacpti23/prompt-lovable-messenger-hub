@@ -159,28 +159,78 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     }
   };
 
+  // Abordagem alternativa: criar a fila de mensagens diretamente no frontend
   const onStartCampaign = async (campaignId: string) => {
     if (!user) return;
     setStartingCampaign(campaignId);
+    
     try {
-      // Directly call the RPC to queue messages and activate the campaign
-      const { data, error } = await supabase.rpc('queue_and_activate_campaign', {
-        campaign_id_param: campaignId,
-      });
-
-      if (error) {
-        throw new Error(error.message);
+      console.log("Iniciando campanha:", campaignId);
+      
+      // 1. Buscar detalhes da campanha
+      const { data: campaign, error: campaignError } = await supabase
+        .from("campaigns")
+        .select("*, instance:instances(instance_name)")
+        .eq("id", campaignId)
+        .single();
+      
+      if (campaignError) throw new Error(`Erro ao buscar campanha: ${campaignError.message}`);
+      console.log("Campanha encontrada:", campaign);
+      
+      if (!campaign.contact_ids || campaign.contact_ids.length === 0) {
+        throw new Error("Campanha não possui contatos");
       }
-
-      if (data && data.startsWith('Error:')) {
-        throw new Error(data);
+      
+      // 2. Buscar contatos
+      const { data: contacts, error: contactsError } = await supabase
+        .from("contacts")
+        .select("id, name, phone")
+        .in("id", campaign.contact_ids);
+      
+      if (contactsError) throw new Error(`Erro ao buscar contatos: ${contactsError.message}`);
+      console.log(`${contacts?.length || 0} contatos encontrados`);
+      
+      if (!contacts || contacts.length === 0) {
+        throw new Error("Nenhum contato encontrado para esta campanha");
       }
+      
+      // 3. Criar mensagens agendadas
+      const scheduledMessages = contacts.map(contact => ({
+        campaign_id: campaignId,
+        contact_id: contact.id,
+        phone: contact.phone,
+        message: campaign.message,
+        media_url: campaign.media_url,
+        scheduled_for: campaign.scheduled_for,
+        status: "pending"
+      }));
+      
+      console.log(`Criando ${scheduledMessages.length} mensagens agendadas`);
+      
+      const { error: insertError } = await supabase
+        .from("scheduled_messages")
+        .insert(scheduledMessages);
+      
+      if (insertError) throw new Error(`Erro ao criar mensagens agendadas: ${insertError.message}`);
+      
+      // 4. Atualizar status da campanha
+      const { error: updateError } = await supabase
+        .from("campaigns")
+        .update({ status: "sending" })
+        .eq("id", campaignId);
+      
+      if (updateError) throw new Error(`Erro ao atualizar status da campanha: ${updateError.message}`);
       
       invalidateQueries();
       sonner.success("Campanha ativada com sucesso!", { 
-        description: "As mensagens foram enfileiradas e serão enviadas em breve." 
+        description: `${scheduledMessages.length} mensagens foram enfileiradas e serão enviadas em breve.` 
       });
+      
+      // Abrir modal de detalhes automaticamente
+      setDetailsModal({ open: true, campaignId });
+      
     } catch (error: any) {
+      console.error("Erro ao ativar campanha:", error);
       sonner.error("Erro ao ativar campanha", { description: error.message });
     } finally {
       setStartingCampaign(null);
