@@ -21,13 +21,36 @@ serve(async (req) => {
   )
 
   try {
+    // --- Start of Combined Dispatcher Logic ---
+    const { data: scheduledCampaigns, error: fetchCampaignsError } = await supabaseClient
+      .from('campaigns')
+      .select('id')
+      .eq('status', 'scheduled')
+      .lte('scheduled_for', new Date().toISOString());
+
+    if (fetchCampaignsError) {
+      console.error(`Error fetching scheduled campaigns: ${fetchCampaignsError.message}`);
+    }
+
+    if (scheduledCampaigns && scheduledCampaigns.length > 0) {
+      for (const campaign of scheduledCampaigns) {
+        const { error: rpcError } = await supabaseClient.rpc('queue_and_activate_campaign', {
+          campaign_id_param: campaign.id,
+        });
+        if (rpcError) {
+          console.error(`Error queuing campaign ${campaign.id}:`, rpcError.message);
+          await supabaseClient.from('campaigns').update({ status: 'failed' }).eq('id', campaign.id);
+        }
+      }
+    }
+    // --- End of Combined Dispatcher Logic ---
+
     if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
       throw new Error('Configuração da Evolution API não encontrada.');
     }
 
     const evolutionApiUrl = EVOLUTION_API_URL.endsWith('/') ? EVOLUTION_API_URL.slice(0, -1) : EVOLUTION_API_URL;
 
-    // 1. Atomically get and lock a batch of message IDs
     const { data: lockedMessages, error: lockError } = await supabaseClient
       .rpc('lock_and_get_pending_message_ids', { limit_count: MESSAGES_PER_RUN });
 
@@ -39,31 +62,20 @@ serve(async (req) => {
 
     const messageIds = lockedMessages.map(m => m.id);
 
-    // 2. Fetch the full data for the locked messages
     const { data: messages, error: fetchError } = await supabaseClient
       .from('scheduled_messages')
       .select(`
-        id,
-        phone,
-        message,
-        media_url,
-        campaign_id,
-        contact_id,
-        scheduled_for,
+        id, phone, message, media_url, campaign_id, contact_id, scheduled_for,
         contact:contacts(name),
         campaign:campaigns!inner(
-          user_id,
-          instance_id,
-          status,
-          pause_between_messages,
-          instance:instances(instance_name)
+          user_id, instance_id, status, pause_between_messages,
+          instance:instances!inner(instance_name)
         )
       `)
       .in('id', messageIds);
 
     if (fetchError) throw new Error(`Error fetching locked message details: ${fetchError.message}`);
     if (!messages || messages.length === 0) {
-        // This case should ideally not happen if IDs were returned, but as a safeguard:
         return new Response(JSON.stringify({ message: 'Mensagens reservadas não encontradas para processamento.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -110,7 +122,6 @@ serve(async (req) => {
         responseData = { error: e.message };
       }
 
-      // 3. Update to the final status and log the result
       await supabaseClient
         .from('scheduled_messages')
         .update({ status: finalStatus, sent_at: finalStatus === 'sent' ? new Date().toISOString() : null })

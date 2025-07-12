@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -35,8 +34,8 @@ const TutorialModal = () => {
                 <p>O sistema de agendamento funciona da seguinte forma:</p>
                 <ul className="list-disc list-inside space-y-1 ml-4">
                   <li><strong>Criação:</strong> Campanhas são criadas como "Rascunho"</li>
-                  <li><strong>Agendamento:</strong> Ao clicar "Iniciar", a campanha fica "Agendada" para execução imediata</li>
-                  <li><strong>Execução:</strong> O sistema verifica campanhas agendadas e envia mensagens uma por vez</li>
+                  <li><strong>Agendamento:</strong> Ao clicar "Iniciar", a campanha fica "Agendada"</li>
+                  <li><strong>Execução:</strong> O sistema verifica campanhas agendadas, cria a fila e envia as mensagens</li>
                   <li><strong>Intervalo:</strong> Respeita o intervalo configurado entre mensagens (padrão: 5 segundos)</li>
                 </ul>
               </div>
@@ -81,11 +80,11 @@ CREATE EXTENSION IF NOT EXISTS pg_net;
 
 -- Criar job que executa a cada minuto
 SELECT cron.schedule(
-    'dispatch-campaign-messages',
+    'process-campaigns',
     '* * * * *',
     $$
     SELECT net.http_post(
-        url := 'https://qjqhepntrlgfgpfhpvom.supabase.co/functions/v1/campaign-dispatcher',
+        url := 'https://qjqhepntrlgfgpfhpvom.supabase.co/functions/v1/message-sender',
         headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqcWhlcG50cmxnZmdwZmhwdm9tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU2MjY2MDUsImV4cCI6MjA2MTIwMjYwNX0.S5MdoJyi-xh3aE7hQkciC4haIT_8ObZqAER9RK2iU_w"}'::jsonb,
         body := '{}'::jsonb
     );
@@ -114,7 +113,7 @@ SELECT cron.schedule(
                       <li>Trigger: Schedule Trigger (a cada 1 minuto)</li>
                       <li>Node: HTTP Request</li>
                       <li>Method: POST</li>
-                      <li>URL: https://qjqhepntrlgfgpfhpvom.supabase.co/functions/v1/campaign-dispatcher</li>
+                      <li>URL: https://qjqhepntrlgfgpfhpvom.supabase.co/functions/v1/message-sender</li>
                       <li>Headers: Content-Type: application/json</li>
                       <li>Body: {"{}"}</li>
                     </ul>
@@ -127,7 +126,7 @@ SELECT cron.schedule(
                   <p className="text-sm mb-3">Para testes ou uso esporádico.</p>
                   
                   <div className="space-y-2 text-sm">
-                    <p><strong>Botão "Testar Disparo":</strong> No Dashboard para execução manual</p>
+                    <p><strong>Botão "Enviar Mensagens da Fila":</strong> No Dashboard para execução manual</p>
                     <p><strong>Postman/cURL:</strong> Para testes de API</p>
                   </div>
                 </div>
