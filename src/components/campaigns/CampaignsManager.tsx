@@ -176,17 +176,17 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         throw new Error(error.message);
       }
 
-      if (data.startsWith('Error:')) {
+      // CORREÇÃO: Checar a resposta da função antes de prosseguir
+      if (data.startsWith('Success:')) {
+        sonner.success("Campanha ativada!", { description: data });
+        invalidateQueries();
+        setDetailsModal({ open: true, campaignId }); // Abrir modal apenas em caso de sucesso
+      } else if (data.startsWith('Info:')) {
+        sonner.info("Aviso da Campanha", { description: data });
+        invalidateQueries();
+      } else { // Tratar como erro
         throw new Error(data);
       }
-
-      sonner.success("Campanha ativada com sucesso!", { 
-        description: data // A função retorna uma mensagem de sucesso
-      });
-      
-      invalidateQueries();
-      // Abrir modal de detalhes automaticamente
-      setDetailsModal({ open: true, campaignId });
       
     } catch (error: any) {
       console.error("Erro ao ativar campanha:", error);
