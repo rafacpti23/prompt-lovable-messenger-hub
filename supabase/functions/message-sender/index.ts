@@ -8,7 +8,6 @@ const corsHeaders = {
 
 const EVOLUTION_API_URL = 'https://api.ramelseg.com.br';
 const EVOLUTION_API_KEY = 'd86920ba398e31464c46401214779885';
-// Reduzido de 10 para 4 para evitar timeouts da função
 const MESSAGES_PER_RUN = 4;
 
 serve(async (req) => {
@@ -26,12 +25,19 @@ serve(async (req) => {
       throw new Error('Configuração da Evolution API não encontrada.');
     }
 
-    let evolutionApiUrl = EVOLUTION_API_URL.endsWith('/') ? EVOLUTION_API_URL.slice(0, -1) : EVOLUTION_API_URL;
+    const evolutionApiUrl = EVOLUTION_API_URL.endsWith('/') ? EVOLUTION_API_URL.slice(0, -1) : EVOLUTION_API_URL;
 
+    // 1. Buscar mensagens pendentes
     const { data: messages, error: fetchError } = await supabaseClient
       .from('scheduled_messages')
       .select(`
-        *,
+        id,
+        phone,
+        message,
+        media_url,
+        campaign_id,
+        contact_id,
+        scheduled_for,
         contact:contacts(name),
         campaign:campaigns!inner(
           user_id,
@@ -52,15 +58,24 @@ serve(async (req) => {
       return new Response(JSON.stringify({ message: 'Nenhuma mensagem pendente para enviar.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    // 2. "Reservar" as mensagens, mudando o status para 'sending'
+    const messageIds = messages.map(m => m.id);
+    await supabaseClient
+      .from('scheduled_messages')
+      .update({ status: 'sending' })
+      .in('id', messageIds);
+
     let sentCount = 0;
     for (const msg of messages) {
       const { campaign } = msg;
-      if (!campaign || !campaign.instance) {
-        await supabaseClient.from('scheduled_messages').update({ status: 'failed' }).eq('id', msg.id);
-        continue;
-      }
+      let finalStatus = 'failed';
+      let responseData: any = { error: 'Unknown error' };
 
       try {
+        if (!campaign || !campaign.instance) {
+          throw new Error('Dados da campanha ou instância ausentes.');
+        }
+
         const { data: canSend, error: rpcError } = await supabaseClient.rpc('decrement_user_credits', { user_id_param: campaign.user_id });
         if (rpcError || !canSend) {
           throw new Error('Créditos insuficientes ou erro ao decrementar.');
@@ -81,41 +96,33 @@ serve(async (req) => {
           response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
         }
 
+        responseData = await response.json();
         if (!response.ok) {
-          const errorText = await response.text();
-          const errorJson = JSON.parse(errorText || '{ "message": "Erro desconhecido" }');
-          throw new Error(errorJson.message || `HTTP error! status: ${response.status}`);
+          throw new Error(responseData.message || `HTTP error! status: ${response.status}`);
         }
 
-        const responseData = await response.json();
-        
-        await supabaseClient.from('scheduled_messages').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', msg.id);
-        
-        await supabaseClient.from('messages_log').insert({
-            campaign_id: msg.campaign_id,
-            contact_id: msg.contact_id,
-            phone: msg.phone,
-            message: personalizedMessage,
-            status: 'sent',
-            response: responseData,
-            scheduled_for: msg.scheduled_for
-        });
-
+        finalStatus = 'sent';
         sentCount++;
 
       } catch (e) {
-        await supabaseClient.from('scheduled_messages').update({ status: 'failed' }).eq('id', msg.id);
-
-        await supabaseClient.from('messages_log').insert({
-            campaign_id: msg.campaign_id,
-            contact_id: msg.contact_id,
-            phone: msg.phone,
-            message: msg.message,
-            status: 'failed',
-            response: { error: e.message },
-            scheduled_for: msg.scheduled_for
-        });
+        responseData = { error: e.message };
       }
+
+      // 3. Atualizar para o status final e registrar no log
+      await supabaseClient
+        .from('scheduled_messages')
+        .update({ status: finalStatus, sent_at: finalStatus === 'sent' ? new Date().toISOString() : null })
+        .eq('id', msg.id);
+
+      await supabaseClient.from('messages_log').insert({
+          campaign_id: msg.campaign_id,
+          contact_id: msg.contact_id,
+          phone: msg.phone,
+          message: msg.message,
+          status: finalStatus,
+          response: responseData,
+          scheduled_for: msg.scheduled_for
+      });
 
       const pauseDuration = campaign.pause_between_messages || 5;
       if (pauseDuration > 0) {
