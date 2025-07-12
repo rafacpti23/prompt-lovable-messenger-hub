@@ -163,16 +163,21 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     if (!user) return;
     setStartingCampaign(campaignId);
     try {
-      await supabase.from('campaigns').update({ status: 'scheduled' }).eq('id', campaignId);
-      const { data: rpcData, error: rpcError } = await supabase.rpc('queue_and_activate_campaign', { campaign_id_param: campaignId });
-      if (rpcError) throw new Error(`Erro ao enfileirar mensagens: ${rpcError.message}`);
+      const { error } = await supabase
+        .from('campaigns')
+        .update({ status: 'scheduled' })
+        .eq('id', campaignId);
+
+      if (error) {
+        throw error;
+      }
       
       invalidateQueries();
-      sonner.success("Campanha ativada com sucesso!", { description: "As mensagens foram enfileiradas e serão enviadas em breve." });
+      sonner.success("Campanha agendada com sucesso!", { 
+        description: "O sistema irá processá-la e iniciar os envios em breve." 
+      });
     } catch (error: any) {
-      sonner.error("Erro ao iniciar campanha", { description: error.message });
-      await supabase.from('campaigns').update({ status: 'draft' }).eq('id', campaignId);
-      invalidateQueries();
+      sonner.error("Erro ao agendar campanha", { description: error.message });
     } finally {
       setStartingCampaign(null);
     }
