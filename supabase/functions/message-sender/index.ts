@@ -27,7 +27,19 @@ serve(async (req) => {
 
     const evolutionApiUrl = EVOLUTION_API_URL.endsWith('/') ? EVOLUTION_API_URL.slice(0, -1) : EVOLUTION_API_URL;
 
-    // 1. Buscar mensagens pendentes
+    // 1. Atomically get and lock a batch of message IDs
+    const { data: lockedMessages, error: lockError } = await supabaseClient
+      .rpc('lock_and_get_pending_message_ids', { limit_count: MESSAGES_PER_RUN });
+
+    if (lockError) throw new Error(`Error locking messages: ${lockError.message}`);
+
+    if (!lockedMessages || lockedMessages.length === 0) {
+      return new Response(JSON.stringify({ message: 'Nenhuma mensagem pendente para enviar.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const messageIds = lockedMessages.map(m => m.id);
+
+    // 2. Fetch the full data for the locked messages
     const { data: messages, error: fetchError } = await supabaseClient
       .from('scheduled_messages')
       .select(`
@@ -47,23 +59,13 @@ serve(async (req) => {
           instance:instances(instance_name)
         )
       `)
-      .eq('status', 'pending')
-      .eq('campaign.status', 'sending')
-      .lte('scheduled_for', new Date().toISOString())
-      .limit(MESSAGES_PER_RUN);
-
-    if (fetchError) throw new Error(`Erro ao buscar mensagens: ${fetchError.message}`);
-
-    if (!messages || messages.length === 0) {
-      return new Response(JSON.stringify({ message: 'Nenhuma mensagem pendente para enviar.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    // 2. "Reservar" as mensagens, mudando o status para 'sending'
-    const messageIds = messages.map(m => m.id);
-    await supabaseClient
-      .from('scheduled_messages')
-      .update({ status: 'sending' })
       .in('id', messageIds);
+
+    if (fetchError) throw new Error(`Error fetching locked message details: ${fetchError.message}`);
+    if (!messages || messages.length === 0) {
+        // This case should ideally not happen if IDs were returned, but as a safeguard:
+        return new Response(JSON.stringify({ message: 'Mensagens reservadas não encontradas para processamento.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     let sentCount = 0;
     for (const msg of messages) {
@@ -108,7 +110,7 @@ serve(async (req) => {
         responseData = { error: e.message };
       }
 
-      // 3. Atualizar para o status final e registrar no log
+      // 3. Update to the final status and log the result
       await supabaseClient
         .from('scheduled_messages')
         .update({ status: finalStatus, sent_at: finalStatus === 'sent' ? new Date().toISOString() : null })
@@ -122,7 +124,7 @@ serve(async (req) => {
           status: finalStatus,
           response: responseData,
           scheduled_for: msg.scheduled_for,
-          user_id: campaign.user_id // Adicionando o user_id
+          user_id: campaign.user_id
       });
 
       const pauseDuration = campaign.pause_between_messages || 5;
