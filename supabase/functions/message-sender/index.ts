@@ -20,107 +20,75 @@ serve(async (req) => {
     )
 
     // Obter credenciais da Evolution API das variáveis de ambiente
-    const EVOLUTION_API_URL = Deno.env.get('EVOLUTION_API_URL');
-    const EVOLUTION_API_KEY = Deno.env.get('EVOLUTION_API_KEY');
+    const EVOLUTION_API_URL = Deno.env.get('EVOLUTION_API_URL') || 'https://api.ramelseg.com.br';
+    const EVOLUTION_API_KEY = Deno.env.get('EVOLUTION_API_KEY') || 'd86920ba398e31464c46401214779885';
 
-    if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
-      console.error('Erro: Credenciais da Evolution API não configuradas nas variáveis de ambiente.');
-      throw new Error('Configuração da Evolution API não encontrada. Verifique EVOLUTION_API_URL e EVOLUTION_API_KEY.');
-    }
+    console.log("Using Evolution API URL:", EVOLUTION_API_URL);
+    console.log("API Key configured:", EVOLUTION_API_KEY ? "Yes" : "No");
 
     const MESSAGES_PER_RUN = 5; // Processar 5 mensagens por vez
 
-    // 1. Travar mensagens e obter seus IDs de forma atômica
-    console.log("Attempting to lock pending messages...");
-    const { data: lockedMessages, error: lockError } = await supabaseClient.rpc(
-      'lock_and_get_pending_message_ids',
+    // 1. Buscar mensagens pendentes usando a nova função simplificada
+    console.log("Fetching pending messages...");
+    const { data: pendingMessages, error: fetchError } = await supabaseClient.rpc(
+      'get_pending_messages',
       { limit_count: MESSAGES_PER_RUN }
     );
 
-    if (lockError) {
-      console.error("Error locking messages:", lockError);
-      throw new Error(`Error locking messages: ${lockError.message}`);
+    if (fetchError) {
+      console.error("Error fetching pending messages:", fetchError);
+      throw new Error(`Error fetching pending messages: ${fetchError.message}`);
     }
 
-    if (!lockedMessages || lockedMessages.length === 0) {
+    if (!pendingMessages || pendingMessages.length === 0) {
       console.log("No pending messages to process.");
       return new Response(JSON.stringify({ message: 'Nenhuma mensagem na fila para processar.' }), { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       });
     }
 
-    const messageIds = lockedMessages.map((m: { id: string }) => m.id);
-    console.log(`Locked ${messageIds.length} messages for processing:`, messageIds);
-
-    // 2. Buscar detalhes completos das mensagens já travadas
-    console.log("Fetching full message details...");
-    const { data: messages, error: fetchError } = await supabaseClient
-      .from('scheduled_messages')
-      .select(`
-        id, phone, message, media_url, campaign_id, contact_id, scheduled_for,
-        contact:contacts(name),
-        campaign:campaigns(
-          user_id, instance_id, status, pause_between_messages,
-          instance:instances(instance_name)
-        )
-      `)
-      .in('id', messageIds);
-
-    if (fetchError) {
-      console.error("Error fetching message details:", fetchError);
-      throw new Error(`Error fetching details for locked messages: ${fetchError.message}`);
-    }
+    console.log(`Found ${pendingMessages.length} pending messages to process.`);
 
     let sentCount = 0;
     let failedCount = 0;
     
-    for (const msg of messages) {
-      console.log(`Processing message ID: ${msg.id}, Phone: ${msg.phone}`);
+    for (const msg of pendingMessages) {
+      console.log(`Processing message ID: ${msg.message_id}, Phone: ${msg.phone}`);
       
-      const { campaign } = msg;
+      // Marcar a mensagem como "sending" para evitar processamento duplicado
+      await supabaseClient
+        .from('scheduled_messages')
+        .update({ status: 'sending' })
+        .eq('id', msg.message_id);
+      
       let finalStatus = 'failed';
       let responseData: any = { error: 'Unknown error' };
 
       try {
-        if (!campaign) {
-          throw new Error(`Campanha ID ${msg.campaign_id} não encontrada.`);
-        }
-        if (!campaign.instance) {
-          throw new Error(`Instância para a campanha ID ${msg.campaign_id} não foi encontrada ou está desassociada.`);
-        }
-        if (campaign.status !== 'sending') {
-            console.log(`Skipping message ${msg.id} because campaign ${campaign.id} is not in 'sending' status (current: ${campaign.status}).`);
-            // Se a campanha não está em 'sending', a mensagem não deveria ter sido travada.
-            // Isso pode indicar um problema na RPC 'lock_and_get_pending_message_ids' ou um status desatualizado.
-            // Para evitar que a mensagem fique presa em 'sending' na scheduled_messages, vamos marcá-la como 'failed'
-            // e registrar o motivo.
-            finalStatus = 'failed';
-            responseData = { error: `Campanha não está em status 'sending'. Status atual: ${campaign.status}` };
-            failedCount++;
-            // Atualizar o status da mensagem para 'failed' e registrar no log
-            await supabaseClient
-              .from('scheduled_messages')
-              .update({ status: finalStatus })
-              .eq('id', msg.id);
-            await supabaseClient.from('messages_log').insert({
-                campaign_id: msg.campaign_id, contact_id: msg.contact_id, phone: msg.phone,
-                message: msg.message, status: finalStatus, response: responseData,
-                scheduled_for: msg.scheduled_for, user_id: campaign.user_id
-            });
-            continue; // Pula para a próxima mensagem
-        }
-
-        console.log(`Decrementing credits for user: ${campaign.user_id}`);
+        // Verificar créditos do usuário
+        console.log(`Decrementing credits for user: ${msg.user_id}`);
         const { data: canSend, error: rpcError } = await supabaseClient.rpc(
           'decrement_user_credits', 
-          { user_id_param: campaign.user_id }
+          { user_id_param: msg.user_id }
         );
 
         if (rpcError) throw new Error(`Erro ao decrementar créditos: ${rpcError.message}`);
         if (!canSend) throw new Error('Créditos insuficientes.');
         console.log("Credits decremented successfully.");
 
-        const personalizedMessage = msg.message.replace(/{{nome}}/g, msg.contact?.name || '').replace(/{{telefone}}/g, msg.phone || '');
+        // Personalizar a mensagem
+        const { data: contactData } = await supabaseClient
+          .from('contacts')
+          .select('name')
+          .eq('id', msg.contact_id)
+          .single();
+        
+        const contactName = contactData?.name || '';
+        const personalizedMessage = msg.message
+          .replace(/{{nome}}/g, contactName)
+          .replace(/{{telefone}}/g, msg.phone || '');
+
+        // Preparar a requisição para a Evolution API
         const headers = { 'Content-Type': 'application/json', 'apikey': EVOLUTION_API_KEY };
         
         let response;
@@ -128,54 +96,73 @@ serve(async (req) => {
         let body;
 
         if (msg.media_url) {
-          url = `${EVOLUTION_API_URL}/message/sendMedia/${campaign.instance.instance_name}`;
-          body = { number: msg.phone, mediaMessage: { mediaType: msg.media_url.match(/\.(mp4|mov|avi)$/i) ? 'video' : 'image', url: msg.media_url, caption: personalizedMessage } };
-          console.log(`Sending media message to ${url} with body:`, JSON.stringify(body));
+          url = `${EVOLUTION_API_URL}/message/sendMedia/${msg.instance_name}`;
+          body = { 
+            number: msg.phone, 
+            mediaMessage: { 
+              mediaType: msg.media_url.match(/\.(mp4|mov|avi)$/i) ? 'video' : 'image', 
+              url: msg.media_url, 
+              caption: personalizedMessage 
+            } 
+          };
+          console.log(`Sending media message to ${url}`);
           response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
         } else {
-          url = `${EVOLUTION_API_URL}/message/sendText/${campaign.instance.instance_name}`;
+          url = `${EVOLUTION_API_URL}/message/sendText/${msg.instance_name}`;
           body = { number: msg.phone, text: personalizedMessage };
-          console.log(`Sending text message to ${url} with body:`, JSON.stringify(body));
+          console.log(`Sending text message to ${url}`);
           response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
         }
 
         responseData = await response.json();
         console.log("Evolution API response:", responseData);
+        
         if (!response.ok) throw new Error(responseData.message || `HTTP error! status: ${response.status}`);
 
         finalStatus = 'sent';
         sentCount++;
 
       } catch (e: any) {
-        console.error(`Error processing message ${msg.id}:`, e.message);
+        console.error(`Error processing message ${msg.message_id}:`, e.message);
         responseData = { error: e.message };
         failedCount++;
       }
 
-      // 3. Atualizar o status final da mensagem (de 'sending' para 'sent' ou 'failed')
-      console.log(`Updating scheduled_message ${msg.id} to status: ${finalStatus}`);
+      // Atualizar o status final da mensagem
+      console.log(`Updating message ${msg.message_id} to status: ${finalStatus}`);
       await supabaseClient
         .from('scheduled_messages')
-        .update({ status: finalStatus, sent_at: finalStatus === 'sent' ? new Date().toISOString() : null })
-        .eq('id', msg.id);
+        .update({ 
+          status: finalStatus, 
+          sent_at: finalStatus === 'sent' ? new Date().toISOString() : null 
+        })
+        .eq('id', msg.message_id);
 
-      // 4. Registrar no log
-      console.log(`Logging message ${msg.id} with status: ${finalStatus}`);
+      // Registrar no log
+      console.log(`Logging message ${msg.message_id} with status: ${finalStatus}`);
       await supabaseClient.from('messages_log').insert({
-          campaign_id: msg.campaign_id, contact_id: msg.contact_id, phone: msg.phone,
-          message: msg.message, status: finalStatus, response: responseData,
-          scheduled_for: msg.scheduled_for, user_id: campaign.user_id
+          campaign_id: msg.campaign_id, 
+          contact_id: msg.contact_id, 
+          phone: msg.phone,
+          message: msg.message, 
+          status: finalStatus, 
+          response: responseData,
+          scheduled_for: msg.scheduled_for, 
+          user_id: msg.user_id
       });
 
-      const pauseDuration = campaign?.pause_between_messages || 5;
-      if (pauseDuration > 0 && (sentCount + failedCount) < messages.length) {
+      // Pausa entre mensagens
+      const pauseDuration = 5; // Padrão de 5 segundos
+      if (pauseDuration > 0 && (sentCount + failedCount) < pendingMessages.length) {
         console.log(`Pausing for ${pauseDuration} seconds before next message.`);
         await new Promise(resolve => setTimeout(resolve, pauseDuration * 1000));
       }
     }
 
     console.log(`Completed processing. Sent: ${sentCount}, Failed: ${failedCount}.`);
-    return new Response(JSON.stringify({ message: `${sentCount} enviadas, ${failedCount} falharam.` }), { 
+    return new Response(JSON.stringify({ 
+      message: `${sentCount} mensagens enviadas, ${failedCount} falharam.` 
+    }), { 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     });
 
