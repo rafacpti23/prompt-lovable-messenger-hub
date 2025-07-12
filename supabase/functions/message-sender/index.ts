@@ -8,7 +8,8 @@ const corsHeaders = {
 
 const EVOLUTION_API_URL = 'https://api.ramelseg.com.br';
 const EVOLUTION_API_KEY = 'd86920ba398e31464c46401214779885';
-const MESSAGES_PER_RUN = 10;
+// Reduzido de 10 para 4 para evitar timeouts da função
+const MESSAGES_PER_RUN = 4;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -116,8 +117,9 @@ serve(async (req) => {
         });
       }
 
-      if (campaign.pause_between_messages > 0) {
-        await new Promise(resolve => setTimeout(resolve, campaign.pause_between_messages * 1000));
+      const pauseDuration = campaign.pause_between_messages || 5;
+      if (pauseDuration > 0) {
+        await new Promise(resolve => setTimeout(resolve, pauseDuration * 1000));
       }
     }
 
