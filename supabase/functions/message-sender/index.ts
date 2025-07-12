@@ -52,7 +52,7 @@ serve(async (req) => {
     const { data: messages, error: fetchError } = await supabaseClient
       .from('scheduled_messages')
       .select(`
-        id, phone, message, media_url, campaign_id, contact_id,
+        id, phone, message, media_url, campaign_id, contact_id, scheduled_for,
         contact:contacts(name),
         campaign:campaigns(
           user_id, instance_id, status, pause_between_messages,
@@ -77,8 +77,15 @@ serve(async (req) => {
       let responseData: any = { error: 'Unknown error' };
 
       try {
-        if (!campaign || !campaign.instance) {
-          throw new Error('Dados da campanha ou instância ausentes.');
+        if (!campaign) {
+          throw new Error(`Campanha ID ${msg.campaign_id} não encontrada.`);
+        }
+        if (!campaign.instance) {
+          throw new Error(`Instância para a campanha ID ${msg.campaign_id} não foi encontrada ou está desassociada.`);
+        }
+        if (campaign.status !== 'sending') {
+            console.log(`Skipping message ${msg.id} because campaign ${campaign.id} is not in 'sending' status (current: ${campaign.status}).`);
+            continue; // Pula para a próxima mensagem
         }
 
         const { data: canSend, error: rpcError } = await supabaseClient.rpc(
@@ -110,7 +117,7 @@ serve(async (req) => {
         sentCount++;
 
       } catch (e) {
-        console.error(`Error sending message ${msg.id}:`, e);
+        console.error(`Error processing message ${msg.id}:`, e);
         responseData = { error: e.message };
         failedCount++;
       }
