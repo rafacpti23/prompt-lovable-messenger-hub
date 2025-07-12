@@ -33,7 +33,7 @@ serve(async (req) => {
     // Buscar mensagens pendentes
     const { data: pendingMessages, error: pendingError } = await supabaseClient
       .from('scheduled_messages')
-      .select('id')
+      .select('id, campaign_id')
       .eq('status', 'pending')
       .limit(MESSAGES_PER_RUN);
 
@@ -51,8 +51,9 @@ serve(async (req) => {
 
     console.log(`Found ${pendingMessages.length} pending messages`);
     const messageIds = pendingMessages.map(m => m.id);
+    const campaignIds = [...new Set(pendingMessages.map(m => m.campaign_id))];
 
-    // Buscar detalhes completos das mensagens SEM alterar o status ainda
+    // Buscar detalhes completos das mensagens
     const { data: messages, error: fetchError } = await supabaseClient
       .from('scheduled_messages')
       .select(`
@@ -79,6 +80,7 @@ serve(async (req) => {
 
     console.log(`Processing ${messages.length} messages`);
     let sentCount = 0;
+    let failedCount = 0;
     
     for (const msg of messages) {
       console.log(`Processing message ID: ${msg.id}, Phone: ${msg.phone}`);
@@ -170,15 +172,15 @@ serve(async (req) => {
         console.error(`Error sending message ${msg.id}:`, e);
         responseData = { error: e.message };
         finalStatus = 'failed';
+        failedCount++;
       }
 
-      // Atualizar status da mensagem - usando apenas valores válidos
+      // Atualizar status da mensagem
       console.log(`Updating message ${msg.id} status to: ${finalStatus}`);
-      const updateData: any = { status: finalStatus };
-      
-      if (finalStatus === 'sent') {
-        updateData.sent_at = new Date().toISOString();
-      }
+      const updateData: any = { 
+        status: finalStatus,
+        sent_at: finalStatus === 'sent' ? new Date().toISOString() : null
+      };
 
       const { error: updateError } = await supabaseClient
         .from('scheduled_messages')
@@ -187,7 +189,6 @@ serve(async (req) => {
 
       if (updateError) {
         console.error(`Error updating message ${msg.id}:`, updateError);
-        // Continuar processando outras mensagens mesmo se uma falhar na atualização
       }
 
       // Registrar no log de mensagens
@@ -209,16 +210,38 @@ serve(async (req) => {
 
       // Pausa entre mensagens
       const pauseDuration = campaign.pause_between_messages || 5;
-      if (pauseDuration > 0 && sentCount < messages.length) {
+      if (pauseDuration > 0 && sentCount + failedCount < messages.length) {
         console.log(`Pausing for ${pauseDuration} seconds before next message`);
         await new Promise(resolve => setTimeout(resolve, pauseDuration * 1000));
       }
     }
 
-    console.log(`Completed processing. Sent ${sentCount} of ${messages.length} messages.`);
+    // Verificar se a campanha deve ser marcada como concluída
+    for (const campaignId of campaignIds) {
+      const { count: pendingCount, error: countError } = await supabaseClient
+        .from('scheduled_messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('campaign_id', campaignId)
+        .in('status', ['pending', 'sending']);
+
+      if (countError) {
+        console.error(`Error counting pending messages for campaign ${campaignId}:`, countError);
+        continue;
+      }
+
+      if (pendingCount === 0) {
+        console.log(`Marking campaign ${campaignId} as completed`);
+        await supabaseClient
+          .from('campaigns')
+          .update({ status: 'completed' })
+          .eq('id', campaignId);
+      }
+    }
+
+    console.log(`Completed processing. Sent ${sentCount}, Failed ${failedCount} of ${messages.length} messages.`);
     return new Response(
       JSON.stringify({ 
-        message: `${sentCount} de ${messages.length} mensagens processadas com sucesso.`,
+        message: `${sentCount} enviadas, ${failedCount} falharam de ${messages.length} mensagens.`,
         success: true
       }), 
       { 
