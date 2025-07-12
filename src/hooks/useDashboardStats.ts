@@ -11,16 +11,12 @@ export interface DashboardStats {
 }
 
 const fetchStats = async (userId: string): Promise<DashboardStats> => {
-  // Mensagens enviadas (messages_log)
+  // Mensagens enviadas (agora consulta simplificada)
   const { count: sentMessages } = await supabase
     .from("messages_log")
     .select("id", { count: "exact", head: true })
-    .eq("status", "sent")
-    .filter(
-      "campaign_id",
-      "in",
-      `(select id from campaigns where user_id='${userId}')`
-    );
+    .eq("user_id", userId)
+    .eq("status", "sent");
 
   // Campanhas
   const { count: totalCampaigns } = await supabase

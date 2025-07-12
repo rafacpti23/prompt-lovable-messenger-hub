@@ -121,7 +121,8 @@ serve(async (req) => {
           message: msg.message,
           status: finalStatus,
           response: responseData,
-          scheduled_for: msg.scheduled_for
+          scheduled_for: msg.scheduled_for,
+          user_id: campaign.user_id // Adicionando o user_id
       });
 
       const pauseDuration = campaign.pause_between_messages || 5;

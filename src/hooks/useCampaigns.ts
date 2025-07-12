@@ -2,6 +2,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useEffect } from "react";
+import { toast as sonner } from "sonner";
+import { Bell } from "lucide-react";
 
 const fetchCampaigns = async (userId: string) => {
   const { data, error } = await supabase
@@ -38,7 +40,15 @@ export function useCampaigns() {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'campaigns', filter: `user_id=eq.${user.id}` },
         (payload) => {
-          // Quando uma mudança de status é detectada, atualiza tudo
+          // Notificar quando a campanha for concluída
+          if (payload.old.status !== 'completed' && payload.new.status === 'completed') {
+            sonner.success("Campanha Concluída!", {
+              description: `A campanha "${payload.new.name}" foi finalizada.`,
+              icon: <Bell className="h-4 w-4" />,
+            });
+          }
+          
+          // Atualizar os dados na tela
           queryClient.invalidateQueries({ queryKey: ['campaigns', user.id] });
           queryClient.invalidateQueries({ queryKey: ['dashboardStats', user.id] });
           queryClient.invalidateQueries({ queryKey: ['userSubscription', user.id] });
