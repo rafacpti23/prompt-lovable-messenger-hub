@@ -8,11 +8,12 @@ import { MessageSquare, Mail, Lock, User, Eye, EyeOff, Phone } from "lucide-reac
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "./AuthProvider";
 import FloatingWhatsAppIcons from "./FloatingWhatsAppIcons";
-import AnimatedFeatureList from "./AnimatedFeatureList";
+import ScreenshotShowcase from "./ScreenshotShowcase";
 import CountdownBanner from "./CountdownBanner";
 import ContactWidget from "./ContactWidget";
 import PlanSelector from "../billing/PlanSelector";
 import AnimatedGradientText from "./AnimatedGradientText";
+import AuthFooter from "./AuthFooter";
 
 const LoginForm = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -138,7 +139,7 @@ const LoginForm = () => {
             <p className="text-2xl text-white/80 max-w-lg">
               A plataforma de automação para WhatsApp que impulsiona seu negócio para o futuro.
             </p>
-            <AnimatedFeatureList />
+            <ScreenshotShowcase />
           </div>
 
           {/* Right Side: Login Form */}
@@ -308,6 +309,7 @@ const LoginForm = () => {
           <PlanSelector showTrial={true} />
         </div>
       </div>
+      <AuthFooter />
     </div>
   );
 };
