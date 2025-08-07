@@ -9,7 +9,7 @@ import QuickMetrics from './QuickMetrics';
 import SmsIcon from '@mui/icons-material/Sms';
 import CampaignIcon from '@mui/icons-material/Campaign';
 import ContactsIcon from '@mui/icons-material/Contacts';
-import SmartphoneSetupIcon from '@mui/icons-material/SmartphoneSetup';
+import SmartphoneIcon from '@mui/icons-material/Smartphone';
 
 import { useDashboardStats } from '@/hooks/useDashboardStats';
 
@@ -54,7 +54,7 @@ const Dashboard = () => {
             <StatsCard 
               title="Instâncias Ativas" 
               value={isLoading ? '...' : stats?.totalInstances ?? 0}
-              icon={<SmartphoneSetupIcon />} 
+              icon={<SmartphoneIcon />} 
               color="#FF9800" 
             />
           </Grid>
