@@ -12,6 +12,7 @@ import AnimatedFeatureList from "./AnimatedFeatureList";
 import CountdownBanner from "./CountdownBanner";
 import ContactWidget from "./ContactWidget";
 import PlanSelector from "../billing/PlanSelector";
+import AnimatedGradientText from "./AnimatedGradientText";
 
 const LoginForm = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -130,7 +131,9 @@ const LoginForm = () => {
           <div className="flex flex-col justify-center h-full pr-0 lg:pr-12">
             <div className="flex items-center space-x-4 mb-6">
               <MessageSquare className="h-16 w-16 text-green-400" />
-              <h1 className="text-6xl font-bold text-white tracking-tighter">WhatsPro</h1>
+              <AnimatedGradientText className="text-6xl font-bold tracking-tighter">
+                WhatsPro
+              </AnimatedGradientText>
             </div>
             <p className="text-2xl text-white/80 max-w-lg">
               A plataforma de automação para WhatsApp que impulsiona seu negócio para o futuro.
