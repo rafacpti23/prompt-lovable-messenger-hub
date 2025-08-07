@@ -1,0 +1,145 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Professional WhatsApp-style theme - Greens, blues, and greys */
+    --background: 0 0% 100%; /* White background */
+    --foreground: 240 10% 3.9%;
+    --card: 145 60% 95%; /* More vibrant green tint for cards */
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 162 90% 35%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 13% 91%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 145 40% 93%; /* Muted green */
+    --muted-foreground: 215 20% 65%;
+    --accent: 145 60% 90%; /* Accent green */
+    --accent-foreground: 162 90% 35%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 48 96% 10%;
+    --info: 217 91% 60%;
+    --info-foreground: 0 0% 100%;
+    --border: 145 40% 88%; /* Greenish border */
+    --input: 0 0% 100%;
+    --ring: 162 90% 35%;
+    --chart-1: 162 90% 35%;
+    --chart-2: 217 91% 60%;
+    --chart-3: 270 91% 60%;
+    --chart-4: 0 84% 60%;
+    --chart-5: 190 91% 60%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    /* Professional dark theme - WhatsApp style */
+    --background: 204 10% 10%; /* #111B21 */
+    --foreground: 210 20% 90%; /* #E6ECF0 */
+    --card: 204 10% 15%; /* #202C33 */
+    --card-foreground: 210 20% 90%;
+    --popover: 204 10% 15%;
+    --popover-foreground: 210 20% 90%;
+    --primary: 160 100% 33%; /* #00A884 */
+    --primary-foreground: 204 10% 10%;
+    --secondary: 215 28% 17%;
+    --secondary-foreground: 210 20% 90%;
+    --muted: 215 28% 17%;
+    --muted-foreground: 218 11% 65%;
+    --accent: 204 10% 15%;
+    --accent-foreground: 160 100% 33%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 48 96% 10%;
+    --info: 217 91% 60%;
+    --info-foreground: 0 0% 100%;
+    --border: 215 28% 17%;
+    --input: 204 10% 15%;
+    --ring: 160 100% 33%;
+    --chart-1: 160 100% 33%;
+    --chart-2: 217 91% 60%;
+    --chart-3: 270 91% 60%;
+    --chart-4: 0 72% 51%;
+    --chart-5: 190 91% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height: 100vh;
+  }
+  .whatsapp-bg {
+    background-color: hsl(var(--muted));
+    background-image: url("data:image/svg+xml,%3Csvg width='600' height='600' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23000000' fill-opacity='0.04'%3E%3Cpath d='M99 0c5.523 0 10 4.477 10 10s-4.477 10-10 10S89 15.523 89 10 93.477 0 99 0zm0 200c5.523 0 10-4.477 10-10s-4.477-10-10-10-10 4.477-10 10 4.477 10 10 10zM10 99c0 5.523 4.477 10 10 10s10-4.477 10-10-4.477-10-10-10-10 4.477-10 10zm180 0c0 5.523-4.477 10-10 10s-10-4.477-10-10 4.477-10 10-10 10 4.477 10 10z'/%3E%3C/g%3E%3C/svg%3E");
+  }
+  .dark .whatsapp-bg {
+    background-color: hsl(var(--background));
+    background-image: url("data:image/svg+xml,%3Csvg width='600' height='600' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M99 0c5.523 0 10 4.477 10 10s-4.477 10-10 10S89 15.523 89 10 93.477 0 99 0zm0 200c5.523 0 10-4.477 10-10s-4.477-10-10-10-10 4.477-10 10 4.477 10 10 10zM10 99c0 5.523 4.477 10 10 10s10-4.477 10-10-4.477-10-10-10-10 4.477-10 10zm180 0c0 5.523-4.477 10-10 10s-10-4.477-10-10 4.477-10 10-10 10 4.477 10 10z'/%3E%3C/g%3E%3C/svg%3E");
+  }
+}
+
+@layer utilities {
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-20px);
+    }
+  }
+
+  @keyframes float-diagonal {
+    0%, 100% {
+      transform: translateY(0px) translateX(0px);
+    }
+    25% {
+      transform: translateY(-15px) translateX(10px);
+    }
+    50% {
+      transform: translateY(-10px) translateX(-5px);
+    }
+    75% {
+      transform: translateY(-20px) translateX(8px);
+    }
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-float-diagonal {
+    animation: float-diagonal 8s ease-in-out infinite;
+  }
+}
+
+.lovable-edit-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.lovable-edit-modal > div {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  max-width: 500px;
+  width: 90%;
+}
