@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import CampaignList from "./CampaignList";
 import CampaignForm from "./CampaignForm";
 import CampaignDetailsModal from "./CampaignDetailsModal";
+import { useInstanceList } from "@/hooks/useInstanceList";
 
 interface Campaign {
   id: string;
@@ -22,6 +23,7 @@ interface CampaignsManagerProps {
 
 const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) => {
   const { user } = useAuth();
+  const { instances, loading: loadingInstances } = useInstanceList();
   const [newCampaign, setNewCampaign] = useState({ name: "", message: "" });
   const [selectedInstanceId, setSelectedInstanceId] = useState<string>("");
   const [selectedGroup, setSelectedGroup] = useState<string>("");
@@ -210,7 +212,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
           selectedGroup={selectedGroup}
           setSelectedGroup={setSelectedGroup}
           createCampaign={createCampaign}
-          instances={[]} // Integre a lista de instâncias se desejar
+          instances={instances}
           selectedInstanceId={selectedInstanceId}
           setSelectedInstanceId={setSelectedInstanceId}
         />
