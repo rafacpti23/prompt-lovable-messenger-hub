@@ -16,6 +16,7 @@ export interface UserSubscription {
     credits: number;
     price_per_message: number;
     duration_days: number;
+    enable_queue_sending: boolean; // Adicionado
   };
 }
 

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, AlertTriangle, Loader2, ListChecks } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -36,15 +36,11 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
   const [googleConnected, setGoogleConnected] = useState(false);
   const [googleSheetName, setGoogleSheetName] = useState<string | null>(null);
   const [selectedGroup, setSelectedGroup] = useState("");
-  const [scheduleType, setScheduleType] = useState<"once" | "recurring">("once");
-  const [scheduleDate, setScheduleDate] = useState("");
-  const [scheduleTime, setScheduleTime] = useState("");
-  const [recurringInterval, setRecurringInterval] = useState(1);
   const [selectedInstanceId, setSelectedInstanceId] = useState("");
 
   const [instances, setInstances] = useState<Array<{id: string, instance_name: string, status: string | null}>>([]);
   
-  React.useEffect(() => {
+  useEffect(() => {
     const fetchInstances = async () => {
       if (!user) return;
       const { data } = await supabase
@@ -67,8 +63,6 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     setMediaUrl(null);
     setSelectedGroup("");
     setSelectedInstanceId("");
-    setScheduleDate("");
-    setScheduleTime("");
     invalidateQueries();
   };
 
@@ -77,22 +71,9 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     setGoogleSheetName("Planilha de Contatos");
   };
 
-  const createCampaign = async () => {
+  const createCampaign = async (sendingMethod: 'batch' | 'queue', intervalConfig?: any[]) => {
     if (!user || !newCampaign.name || !selectedInstanceId || !selectedGroup) {
       toast({ title: "Erro", description: "Preencha todos os campos obrigatórios (Instância, Nome, Grupo)", variant: "destructive" });
-      return;
-    }
-
-    let scheduledForISO: string | null = null;
-    if (scheduleDate && scheduleTime) {
-      const scheduledDateTime = new Date(`${scheduleDate}T${scheduleTime}`);
-      if (scheduledDateTime < new Date()) {
-        toast({ title: "Erro de Agendamento", description: "A data e hora do agendamento não podem ser no passado.", variant: "destructive" });
-        return;
-      }
-      scheduledForISO = scheduledDateTime.toISOString();
-    } else {
-      toast({ title: "Erro de Agendamento", description: "Por favor, defina a data e hora para o envio.", variant: "destructive" });
       return;
     }
 
@@ -113,11 +94,12 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         media_url: mediaUrl,
         contact_ids: contactIds,
         status: "draft",
-        scheduled_for: scheduledForISO
+        sending_method: sendingMethod,
+        interval_config: intervalConfig
       });
       if (error) throw error;
 
-      toast({ title: "Sucesso", description: "Campanha criada com sucesso! Ela será enviada no horário agendado." });
+      toast({ title: "Sucesso", description: "Campanha criada com sucesso! Clique em 'Iniciar' para começar o envio." });
       handleCampaignCreated();
     } catch (error: any) {
       toast({ title: "Erro ao criar campanha", description: error.message, variant: "destructive" });
@@ -164,33 +146,26 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     setStartingCampaign(campaignId);
     
     try {
-      sonner.info("Ativando campanha...", {
-        description: "Aguarde enquanto a fila de mensagens é criada.",
+      sonner.info("Iniciando campanha...", {
+        description: "Aguarde enquanto preparamos as mensagens para envio.",
       });
 
-      const { data, error } = await supabase.rpc('queue_and_activate_campaign', {
+      const { data, error } = await supabase.rpc('start_campaign_processing', {
         campaign_id_param: campaignId
       });
 
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      // CORREÇÃO: Checar a resposta da função antes de prosseguir
+      if (error) throw new Error(error.message);
+      
       if (data.startsWith('Success:')) {
-        sonner.success("Campanha ativada!", { description: data });
+        sonner.success("Campanha iniciada!", { description: data.replace('Success: ', '') });
         invalidateQueries();
-        setDetailsModal({ open: true, campaignId }); // Abrir modal apenas em caso de sucesso
-      } else if (data.startsWith('Info:')) {
-        sonner.info("Aviso da Campanha", { description: data });
-        invalidateQueries();
-      } else { // Tratar como erro
-        throw new Error(data);
+      } else {
+        throw new Error(data.replace('Error: ', ''));
       }
       
     } catch (error: any) {
-      console.error("Erro ao ativar campanha:", error);
-      sonner.error("Erro ao ativar campanha", { description: error.message });
+      console.error("Erro ao iniciar campanha:", error);
+      sonner.error("Erro ao iniciar campanha", { description: error.message });
     } finally {
       setStartingCampaign(null);
     }
@@ -222,7 +197,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Criar Nova Campanha</DialogTitle></DialogHeader>
-            <CampaignForm {...{ newCampaign, setNewCampaign, mediaUrl, setMediaUrl, contactSource, setContactSource, googleConnected, googleSheetName, handleConnectGoogle, setGoogleConnected, setGoogleSheetName, supabaseGroups: contactGroups, googleSheetGroups: [], selectedGroup, setSelectedGroup, scheduleType, setScheduleType, scheduleDate, setScheduleDate, scheduleTime, setScheduleTime, recurringInterval, setRecurringInterval, createCampaign, instances, selectedInstanceId, setSelectedInstanceId }} />
+            <CampaignForm {...{ newCampaign, setNewCampaign, mediaUrl, setMediaUrl, contactSource, setContactSource, googleConnected, googleSheetName, handleConnectGoogle, setGoogleConnected, setGoogleSheetName, supabaseGroups: contactGroups, googleSheetGroups: [], selectedGroup, setSelectedGroup, createCampaign, instances, selectedInstanceId, setSelectedInstanceId }} />
           </DialogContent>
         </Dialog>
       </div>
