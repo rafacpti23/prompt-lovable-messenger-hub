@@ -1,6 +1,6 @@
 -- Instala a extensão pgmq
-CREATE EXTENSION IF NOT EXISTS pgmq;
+CREATE EXTENSION pgmq;
 
--- Cria a fila 'whatsapp_campaigns' se ela ainda não existir
--- A função correta é pgmq.create_queue(text)
-SELECT pgmq.create_queue('whatsapp_campaigns');
+-- Cria a fila 'whatsapp_campaigns' usando a função correta da documentação
+-- A função é pgmq.create(text)
+SELECT pgmq.create('whatsapp_campaigns');
