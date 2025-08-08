@@ -45,8 +45,10 @@ const Dashboard = () => {
         .order('sent_at', { ascending: false })
         .limit(4);
 
-      if (!error && data) {
-        setRecentActivities(data);
+      if (error) {
+        console.error("Error fetching recent activities:", error);
+      } else {
+        setRecentActivities(data || []);
       }
       setActivitiesLoading(false);
     };
@@ -60,22 +62,8 @@ const Dashboard = () => {
     });
 
     try {
-      const { count, error: countError } = await supabase
-        .from('scheduled_messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
-      
-      if (countError) throw new Error(countError.message);
-      
-      if (count === 0) {
-        toast.info("Nenhuma mensagem pendente", {
-          description: "Não há mensagens na fila para envio."
-        });
-        setIsDispatching(false);
-        return;
-      }
-      
-      const { data, error } = await supabase.functions.invoke('message-sender');
+      // Invoca a função queue-worker para processar mensagens da fila avançada
+      const { data, error } = await supabase.functions.invoke('queue-worker');
 
       if (error) throw new Error(error.message);
       if (data.error) throw new Error(data.error);

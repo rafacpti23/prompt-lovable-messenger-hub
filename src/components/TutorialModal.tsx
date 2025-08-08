@@ -100,7 +100,7 @@ const TutorialModal = () => {
                       <li>Trigger: Schedule Trigger (a cada 1 minuto)</li>
                       <li>Node: HTTP Request</li>
                       <li>Method: POST</li>
-                      <li>URL: https://qjqhepntrlgfgpfhpvom.supabase.co/functions/v1/message-sender</li>
+                      <li>URL: https://qjqhepntrlgfgpfhpvom.supabase.co/functions/v1/queue-worker</li>
                       <li>Headers: Content-Type: application/json</li>
                       <li>Body: {"{}"}</li>
                     </ul>
@@ -113,7 +113,7 @@ const TutorialModal = () => {
                   <p className="text-sm mb-3">Para testes ou uso esporádico.</p>
                   
                   <div className="space-y-2 text-sm">
-                    <p><strong>Botão "Enviar Mensagens da Fila":</strong> No Dashboard para execução manual</p>
+                    <p><strong>Botão "Enviar Mensagens da Fila":</strong> No Dashboard para execução manual (aciona o processamento da fila avançada)</p>
                     <p><strong>Postman/cURL:</strong> Para testes de API</p>
                   </div>
                 </div>
