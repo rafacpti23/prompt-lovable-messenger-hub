@@ -273,17 +273,17 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
           <div>
             <label className="block font-medium mb-2">Mensagem da Campanha *</label>
             <Textarea
-              placeholder={`Digite sua mensagem aqui. Use \{\{nome\}\} para personalizar com o nome do contato.${messageType === "text" ? "\n\nEx: Olá \{\{nome\}\}, temos uma oferta especial para você!" : ""}`}
+              placeholder={`Digite sua mensagem aqui. Use {{nome}} para personalizar com o nome do contato.${messageType === "text" ? "\n\nEx: Olá {{nome}}, temos uma oferta especial para você!" : ""}`}
               value={newCampaign.message}
               onChange={(e) => setNewCampaign({...newCampaign, message: e.target.value})}
               rows={4}
             />
             <div className="flex gap-2 mt-2">
               <Button variant="outline" size="sm" onClick={() => insertVariable("{{nome}}")}>
-                Inserir \{\{nome\}\}
+                Inserir {{nome}}
               </Button>
               <Button variant="outline" size="sm" onClick={() => insertVariable("{{telefone}}")}>
-                Inserir \{\{telefone\}\}
+                Inserir {{telefone}}
               </Button>
             </div>
           </div>
