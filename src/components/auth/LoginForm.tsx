@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, Mail, Lock, User, Eye, EyeOff, Phone } from "lucide-react";
+import { MessageSquare, Mail, Lock, User, Eye, EyeOff, Phone, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "./AuthProvider";
 import FloatingWhatsAppIcons from "./FloatingWhatsAppIcons";
@@ -136,9 +136,27 @@ const LoginForm = () => {
                 WhatsPro
               </AnimatedGradientText>
             </div>
-            <p className="text-2xl text-white/80 max-w-lg">
+            <p className="text-2xl text-white/80 max-w-lg mb-8">
               A plataforma de automação para WhatsApp que impulsiona seu negócio para o futuro.
             </p>
+            <div className="space-y-4 mb-8">
+              <div className="flex items-center text-lg text-white/90">
+                <CheckCircle className="h-6 w-6 text-green-400 mr-3" />
+                <span>Envio em massa com personalização</span>
+              </div>
+              <div className="flex items-center text-lg text-white/90">
+                <CheckCircle className="h-6 w-6 text-green-400 mr-3" />
+                <span>Gestão de contatos e grupos</span>
+              </div>
+              <div className="flex items-center text-lg text-white/90">
+                <CheckCircle className="h-6 w-6 text-green-400 mr-3" />
+                <span>Agendamento e automação de campanhas</span>
+              </div>
+               <div className="flex items-center text-lg text-white/90">
+                <CheckCircle className="h-6 w-6 text-green-400 mr-3" />
+                <span>Múltiplas instâncias de WhatsApp</span>
+              </div>
+            </div>
             <ScreenshotShowcase />
           </div>
 
