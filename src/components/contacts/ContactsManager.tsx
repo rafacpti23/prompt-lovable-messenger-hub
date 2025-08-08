@@ -4,11 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Users, Plus, Search, Trash2, Upload, Edit, Move } from "lucide-react";
+import { Users, Plus, Search, Trash2, Upload, Edit, Move, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import GroupSelector from "./GroupSelector";
 import EditContactModal from "./EditContactModal";
 import { supabase } from "@/integrations/supabase/client";
+import { getTagColorClass, cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Contact {
   id: string;
@@ -39,11 +41,27 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
   const [targetGroup, setTargetGroup] = useState("");
   const { toast } = useToast();
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
   const filteredContacts = contacts.filter(contact =>
     (contact.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     contact.phone?.includes(searchTerm) ||
     (contact.group?.toLowerCase().includes(searchTerm.toLowerCase())))
   );
+
+  // Pagination logic
+  const totalContacts = filteredContacts.length;
+  const totalPages = Math.ceil(totalContacts / pageSize);
+  const paginatedContacts = filteredContacts.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, pageSize]);
 
   const handleSelectContact = (contactId: string, isSelected: boolean) => {
     if (isSelected) {
@@ -55,7 +73,7 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
 
   const handleSelectAll = (isSelected: boolean) => {
     if (isSelected) {
-      setSelectedContacts(filteredContacts.map(c => c.id));
+      setSelectedContacts(paginatedContacts.map(c => c.id));
     } else {
       setSelectedContacts([]);
     }
@@ -271,10 +289,10 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="select-all"
-                checked={selectedContacts.length === filteredContacts.length && filteredContacts.length > 0}
+                checked={selectedContacts.length === paginatedContacts.length && paginatedContacts.length > 0}
                 onCheckedChange={(checked) => handleSelectAll(Boolean(checked))}
               />
-              <label htmlFor="select-all" className="text-sm font-medium">Selecionar todos</label>
+              <label htmlFor="select-all" className="text-sm font-medium">Selecionar todos na página</label>
             </div>
           </div>
         </CardHeader>
@@ -285,19 +303,19 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
               <p>Carregando contatos...</p>
             </div>
           ) : (
-          <div className="space-y-3">
-            {filteredContacts.length === 0 ? (
+          <div className="space-y-2">
+            {paginatedContacts.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                 <p>Nenhum contato encontrado</p>
               </div>
             ) : (
-              filteredContacts.map((contact) => (
+              paginatedContacts.map((contact) => (
                 <div
                   key={contact.id}
-                  className="flex items-center justify-between p-2 border border-border rounded-lg hover:bg-accent/50 transition-colors"
+                  className="flex items-center justify-between p-2 py-1 border border-border rounded-lg hover:bg-accent/50 transition-colors"
                 >
-                  <div className="flex items-center space-x-3 min-w-0 flex-1">
+                  <div className="flex items-center space-x-2 min-w-0 flex-1">
                     <Checkbox
                       checked={selectedContacts.includes(contact.id)}
                       onCheckedChange={(checked) => handleSelectContact(contact.id, Boolean(checked))}
@@ -308,7 +326,9 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
                         <p className="text-xs text-muted-foreground">{contact.phone}</p>
                       </div>
                       {contact.group && contact.group !== "" && (
-                        <Badge variant="outline" className="text-xs px-1 py-0 mt-1">{contact.group}</Badge>
+                        <Badge className={cn("text-xs px-1.5 py-0.5 mt-1", getTagColorClass(contact.group))}>
+                          {contact.group}
+                        </Badge>
                       )}
                     </div>
                   </div>
@@ -317,7 +337,7 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
                       variant="ghost"
                       size="sm"
                       onClick={() => openEditModal(contact)}
-                      className="h-7 w-7 p-0"
+                      className="h-6 w-6 p-0"
                     >
                       <Edit className="h-3 w-3" />
                     </Button>
@@ -325,7 +345,7 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
                       variant="ghost"
                       size="sm"
                       onClick={() => deleteContact(contact.id)}
-                      className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                      className="h-6 w-6 p-0 text-destructive hover:text-destructive"
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
@@ -334,6 +354,46 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ contacts, setContacts
               ))
             )}
           </div>
+          )}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                Página {currentPage} de {totalPages}
+              </div>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={String(pageSize)}
+                  onValueChange={(value) => setPageSize(Number(value))}
+                >
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue placeholder="Itens por página" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="20">20 por página</SelectItem>
+                    <SelectItem value="50">50 por página</SelectItem>
+                    <SelectItem value="100">100 por página</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => p - 1)}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Anterior
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => p + 1)}
+                  disabled={currentPage === totalPages}
+                >
+                  Próximo
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>
