@@ -74,9 +74,7 @@ export default function InstanceList({ instances, loading, onShowQr, onConnect, 
           </div>
         ) : (
           instances.map((instance) => (
-            {/* Added max-w-xs and mx-auto for centering */}
             <Card key={instance.id} className="p-4 bg-card rounded-2xl shadow-xl max-w-xs mx-auto w-full">
-              {/* Reduced gap */}
               <CardContent className="p-0 flex flex-col gap-3">
                 {/* Top section: Instance Name and Settings Icon */}
                 <div className="flex items-center justify-between w-full">
@@ -101,17 +99,14 @@ export default function InstanceList({ instances, loading, onShowQr, onConnect, 
                   </Avatar>
                   <div className="flex flex-col flex-1 min-w-0">
                     {instance.profileName && (
-                      {/* Smaller font */}
                       <p className="font-bold text-base text-foreground truncate">{instance.profileName}</p>
                     )}
                     {instance.phone_number && (
-                      {/* Smaller font, reduced mt */}
                       <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
                         <Phone className="h-3 w-3" /> {instance.phone_number}
                       </p>
                     )}
                     {instance.profileStatus && (
-                      {/* Reduced mt */}
                       <p className="text-xs text-gray-400 italic mt-0.5 truncate">"{instance.profileStatus}"</p>
                     )}
                   </div>
@@ -130,7 +125,6 @@ export default function InstanceList({ instances, loading, onShowQr, onConnect, 
                     type={showToken[instance.id] ? "text" : "password"}
                     value="************************" // Placeholder for token
                     readOnly
-                    {/* Smaller text, reduced height */}
                     className="pr-20 bg-muted/50 border-border text-foreground text-xs h-8"
                   />
                   {/* Reduced space-x */}
