@@ -40,6 +40,21 @@ export const deleteInstance = async (instanceName: string) => {
   return invokeManageInstance('delete', instanceName);
 };
 
+// Nova função para buscar todas as instâncias da Evolution API
+export const fetchAllEvolutionInstances = async () => {
+  const { data, error } = await supabase.functions.invoke('fetch-evolution-instances');
+
+  if (error) {
+    throw new Error(`Erro ao comunicar com o servidor para buscar instâncias: ${error.message}`);
+  }
+  
+  if (data.error) {
+    throw new Error(data.error);
+  }
+
+  return data;
+};
+
 // Esta função não é mais necessária, pois a configuração está no servidor.
 export const isApiConfigured = () => {
   return true;

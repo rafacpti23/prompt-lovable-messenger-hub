@@ -7,6 +7,7 @@ import {
   getQrCode,
   connectInstance,
   deleteInstance as deleteInstanceApi,
+  fetchAllEvolutionInstances, // Import the new function
 } from "@/services/evolutionApi";
 import { useUserSubscription } from "./useUserSubscription";
 
@@ -17,6 +18,11 @@ export interface Instance {
   user_id: string;
   phone_number?: string | null;
   qr_code?: string | null;
+  // New fields from Evolution API
+  profileName?: string | null;
+  profilePictureUrl?: string | null;
+  profileStatus?: string | null;
+  owner?: string | null; // WhatsApp JID (e.g., 553198296801@s.whatsapp.net)
 }
 
 export function useManageInstances() {
@@ -26,7 +32,7 @@ export function useManageInstances() {
   const { toast } = useToast();
   const { subscription, loading: subscriptionLoading } = useUserSubscription();
 
-  // Fetch instances from Supabase
+  // Fetch instances from Supabase and Evolution API
   const fetchInstances = useCallback(async () => {
     setLoading(true);
     if (!user) {
@@ -34,16 +40,57 @@ export function useManageInstances() {
       setLoading(false);
       return;
     }
-    const { data, error } = await supabase
-      .from("instances")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
-    if (!error && data) {
-      setInstances(data);
+
+    try {
+      // 1. Fetch instances from Supabase (user's registered instances)
+      const { data: supabaseInstances, error: supabaseError } = await supabase
+        .from("instances")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (supabaseError) throw supabaseError;
+
+      // 2. Fetch all instances from Evolution API
+      const evolutionInstancesRaw = await fetchAllEvolutionInstances();
+      const evolutionInstancesMap = new Map<string, any>();
+      if (Array.isArray(evolutionInstancesRaw)) {
+        evolutionInstancesRaw.forEach((item: any) => {
+          if (item.instance && item.instance.instanceName) {
+            evolutionInstancesMap.set(item.instance.instanceName, item.instance);
+          }
+        });
+      }
+
+      // 3. Merge data
+      const mergedInstances: Instance[] = supabaseInstances.map((sInstance: any) => {
+        const eInstance = evolutionInstancesMap.get(sInstance.instance_name);
+        return {
+          ...sInstance,
+          // Prioritize Evolution API status if available, otherwise use Supabase status
+          status: eInstance?.status || sInstance.status,
+          phone_number: eInstance?.owner?.split('@')[0] || sInstance.phone_number, // Use owner as phone number
+          profileName: eInstance?.profileName || null,
+          profilePictureUrl: eInstance?.profilePictureUrl || null,
+          profileStatus: eInstance?.profileStatus || null,
+          owner: eInstance?.owner || null,
+        };
+      });
+      
+      setInstances(mergedInstances);
+
+    } catch (error: any) {
+      console.error("Error fetching instances:", error);
+      toast({
+        title: "Erro ao carregar instâncias",
+        description: error.message,
+        variant: "destructive",
+      });
+      setInstances([]); // Clear instances on error
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [user]);
+  }, [user, toast]);
 
   // Setup realtime listener for 'instances'
   useEffect(() => {
@@ -64,7 +111,7 @@ export function useManageInstances() {
     };
   }, [user, fetchInstances]);
 
-  // Helper para atualizar instância
+  // Helper para atualizar instância (Supabase only, Evolution API status is real-time)
   const updateInstance = useCallback(async (instanceId: string, data: any) => {
     await supabase
       .from("instances")
@@ -169,21 +216,14 @@ export function useManageInstances() {
         newStatus = "disconnecting";
       }
       
+      // Update Supabase status immediately for UI feedback
       await updateInstance(instance.id, { status: newStatus });
       
-      // Verificar status real após alguns segundos
-      setTimeout(async () => {
-        try {
-          // Aqui você pode implementar uma função para verificar o status real da API
-          // Por enquanto, vamos simular uma atualização baseada na resposta
-          if (response?.status) {
-            await updateInstance(instance.id, { status: response.status });
-          }
-        } catch (error) {
-          console.error("Erro ao verificar status:", error);
-        }
-      }, 3000);
-      
+      // Re-fetch all instances to get the real-time status from Evolution API
+      // This is important because the webhook might take a few seconds to update Supabase
+      // and fetchInstances will get the latest from Evolution API directly.
+      setTimeout(fetchInstances, 3000); // Re-fetch after a short delay
+
       toast({
         title: "Solicitação de conexão enviada!",
         description: "Aguarde o status atualizar.",
@@ -201,11 +241,13 @@ export function useManageInstances() {
   const showQr = async (instance: Instance, setQrModal: (v: any) => void) => {
     try {
       const qrBase64 = await getQrCode(instance.instance_name);
+      // Update Supabase with QR code, status will be updated by webhook or next fetch
       await updateInstance(instance.id, {
         qr_code: qrBase64 || null,
-        status: "pending",
+        status: "pending", // Set to pending in Supabase
       });
       setQrModal({ open: true, instanceName: instance.instance_name, qrBase64 });
+      setTimeout(fetchInstances, 3000); // Re-fetch to get actual status
     } catch (error: any) {
       toast({
         title: "Erro ao buscar QR Code",
@@ -225,6 +267,7 @@ export function useManageInstances() {
         title: "Instância removida",
         description: "Instância deletada com sucesso",
       });
+      fetchInstances(); // Re-fetch to ensure UI is up-to-date
     } catch (error: any) {
       toast({
         title: "Erro ao deletar instância",

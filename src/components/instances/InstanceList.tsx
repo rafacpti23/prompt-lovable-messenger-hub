@@ -1,11 +1,11 @@
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { QrCode, Power, Trash2, MessageSquare } from "lucide-react";
+import { QrCode, Power, Trash2, MessageSquare, UserCircle2, Phone } from "lucide-react";
 import InstanceQrModal from "./InstanceQrModal";
 import { useState } from "react";
 import { type Instance } from "@/hooks/useManageInstances";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface Props {
   instances: Instance[];
@@ -25,6 +25,7 @@ export default function InstanceList({ instances, loading, onShowQr, onConnect, 
       case "close":
       case "disconnected":
         return "bg-red-100 text-red-800";
+      case "connecting":
       case "pending":
         return "bg-yellow-100 text-yellow-800";
       default:
@@ -39,6 +40,8 @@ export default function InstanceList({ instances, loading, onShowQr, onConnect, 
       case "close":
       case "disconnected":
         return "Desconectado";
+      case "connecting":
+        return "Conectando...";
       case "pending":
         return "Aguardando conexão";
       default:
@@ -63,51 +66,66 @@ export default function InstanceList({ instances, loading, onShowQr, onConnect, 
           </div>
         ) : (
           instances.map((instance) => (
-            <Card key={instance.id}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2">
-                      <MessageSquare className="h-5 w-5 text-green-600" />
-                      <span className="font-medium">{instance.instance_name}</span>
+            <Card key={instance.id} className="p-4">
+              <CardContent className="p-0 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex items-center space-x-4 flex-1 min-w-0">
+                  <Avatar className="h-16 w-16">
+                    <AvatarImage src={instance.profilePictureUrl || undefined} alt={instance.profileName || instance.instance_name} />
+                    <AvatarFallback>
+                      <MessageSquare className="h-8 w-8 text-green-600" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-lg truncate">{instance.instance_name}</span>
+                      <Badge className={getStatusColor(instance.status)}>
+                        {getStatusText(instance.status)}
+                      </Badge>
                     </div>
-                    <Badge className={getStatusColor(instance.status)}>
-                      {getStatusText(instance.status)}
-                    </Badge>
+                    {instance.profileName && (
+                      <p className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-1">
+                        <UserCircle2 className="h-4 w-4" /> {instance.profileName}
+                      </p>
+                    )}
                     {instance.phone_number && (
-                      <span className="text-sm text-gray-500">{instance.phone_number}</span>
+                      <p className="text-sm text-gray-500 flex items-center gap-1">
+                        <Phone className="h-4 w-4" /> {instance.phone_number}
+                      </p>
+                    )}
+                    {instance.profileStatus && (
+                      <p className="text-xs text-gray-400 italic truncate">"{instance.profileStatus}"</p>
                     )}
                   </div>
-                  <div className="flex items-center space-x-2">
-                    {(instance.status === "close" ||
-                      instance.status === "disconnected") && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onShowQr(instance, setQrModal)}
-                      >
-                        <QrCode className="h-4 w-4 mr-2" />
-                        QR Code
-                      </Button>
-                    )}
+                </div>
+                <div className="flex flex-wrap justify-end gap-2 mt-4 md:mt-0">
+                  {(instance.status === "close" ||
+                    instance.status === "disconnected") && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => onConnect(instance)}
+                      onClick={() => onShowQr(instance, setQrModal)}
                     >
-                      <Power className="h-4 w-4 mr-2" />
-                      {["connected", "open"].includes(instance.status ?? "")
-                        ? "Desconectar"
-                        : "Conectar"}
+                      <QrCode className="h-4 w-4 mr-2" />
+                      QR Code
                     </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => onDelete(instance)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onConnect(instance)}
+                  >
+                    <Power className="h-4 w-4 mr-2" />
+                    {["connected", "open"].includes(instance.status ?? "")
+                      ? "Desconectar"
+                      : "Conectar"}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => onDelete(instance)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </CardContent>
             </Card>
