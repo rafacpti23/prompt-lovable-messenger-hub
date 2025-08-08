@@ -9,9 +9,10 @@ DECLARE
     v_payload JSONB;
     v_evolution_url TEXT := 'https://api.ramelseg.com.br'; -- Sua URL da Evolution API
     v_evolution_key TEXT := 'd86920ba398e31464c46401214779885'; -- Sua chave da Evolution API
-    v_delay INTERVAL;
+    v_delay_seconds INT;
     v_interval_config JSONB;
-    v_interval_range RECORD;
+    v_interval_min INT;
+    v_interval_max INT;
 BEGIN
     -- Lê as mensagens da fila pgmq usando a função correta da documentação
     -- pgmq.read retorna um conjunto de registros
@@ -27,21 +28,29 @@ BEGIN
 
         -- 1. Obter e aplicar o atraso randômico
         v_interval_config := v_payload->>'interval_config';
-        -- Pega o primeiro intervalo da configuração (simplificação)
-        IF v_interval_config IS NOT NULL THEN
-            -- Converte a string JSONB para um array de registros
+
+        -- Se não houver configuração de intervalo, usa o padrão de 5 segundos
+        IF v_interval_config IS NULL THEN
+            v_delay_seconds := 5;
+        ELSE
+            -- Extrai o primeiro intervalo da configuração (simplificação)
             -- Ajuste conforme a estrutura real do seu interval_config
             -- Exemplo: interval_config = '[{"min": 3, "max": 8}]'
-            FOR v_interval_range IN SELECT * FROM jsonb_populate_recordset(null::(min INT, max INT), v_interval_config)
-            LOOP
-                v_delay := (random() * (v_interval_range.max - v_interval_range.min) + v_interval_range.min) || ' seconds';
-            END LOOP;
-        ELSE
-            v_delay := '5 seconds'; -- Padrão de 5 segundos
+            -- Vamos pegar o primeiro objeto do array
+            SELECT (v_interval_config->0->>'min')::INT INTO v_interval_min;
+            SELECT (v_interval_config->0->>'max')::INT INTO v_interval_max;
+
+            -- Se não encontrou, usa o padrão
+            IF v_interval_min IS NULL OR v_interval_max IS NULL THEN
+                v_delay_seconds := 5;
+            ELSE
+                -- Gera um número aleatório entre min e max (arredondado para o inteiro mais próximo)
+                v_delay_seconds := floor(random() * (v_interval_max - v_interval_min + 1) + v_interval_min);
+            END IF;
         END IF;
 
-        -- Esperar o tempo calculado
-        PERFORM pg_sleep(extract(epoch from v_delay)::INT);
+        -- Esperar o tempo calculado em segundos
+        PERFORM pg_sleep(v_delay_seconds);
 
         -- 2. Enviar a mensagem via Evolution API
         -- Aqui você precisa adaptar para o formato correto da sua API
