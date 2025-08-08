@@ -75,7 +75,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
   const { subscription } = useUserSubscription();
   const [sendingMethod, setSendingMethod] = useState<'batch' | 'queue'>('batch');
   const [intervals, setIntervals] = useState<Interval[]>([{ min: 3, max: 8 }]);
-  const [scheduledFor, setScheduledFor] = useState<string>("");
+  const [scheduledForLocal, setScheduledForLocal] = useState<string>(""); // Renamed to scheduledForLocal
 
   const canUseQueueSending = subscription?.plan?.enable_queue_sending ?? false;
 
@@ -127,7 +127,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
   };
 
   const isFormValid = () => {
-    const hasScheduledFor = scheduledFor && new Date(scheduledFor) > new Date();
+    const hasScheduledFor = scheduledForLocal && new Date(scheduledForLocal) > new Date();
     return (
       selectedInstanceId &&
       newCampaign.name.trim() &&
@@ -135,6 +135,11 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
       hasScheduledFor &&
       (messageType === "text" ? newCampaign.message.trim() : mediaUrl)
     );
+  };
+
+  const handleCreateCampaign = () => {
+    const scheduledForUTC = scheduledForLocal ? new Date(scheduledForLocal).toISOString() : undefined;
+    createCampaign(sendingMethod, sendingMethod === 'queue' ? intervals : undefined, scheduledForUTC);
   };
 
   return (
@@ -210,8 +215,8 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
             <label className="block font-medium mb-2">Data e Hora de Agendamento *</label>
             <Input
               type="datetime-local"
-              value={scheduledFor}
-              onChange={(e) => setScheduledFor(e.target.value)}
+              value={scheduledForLocal}
+              onChange={(e) => setScheduledForLocal(e.target.value)}
               min={new Date().toISOString().slice(0,16)}
             />
           </div>
@@ -364,7 +369,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
 
           {/* Botão criar campanha */}
           <Button 
-            onClick={() => createCampaign(sendingMethod, sendingMethod === 'queue' ? intervals : undefined, scheduledFor)}
+            onClick={handleCreateCampaign} // Call the new handler
             disabled={!isFormValid()}
             className={!isFormValid() ? "opacity-50 cursor-not-allowed" : ""}
           >
