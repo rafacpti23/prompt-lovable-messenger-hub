@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const screenshots = [
-  { src: '/pasted-image-2025-08-07T23-48-12-511Z.png', alt: 'Dashboard Screenshot' },
+  { src: '/pasted-image-2025-08-07T23-48-12-511Zz.png', alt: 'Dashboard Screenshot' },
   { src: '/pasted-image-2025-08-07T23-48-42-946Z.png', alt: 'Contacts Page Screenshot' },
   { src: '/pasted-image-2025-08-07T23-49-03-483Z.png', alt: 'Campaigns Page Screenshot' },
   { src: '/pasted-image-2025-08-07T23-49-17-007Z.png', alt: 'Media Repository Screenshot' },
