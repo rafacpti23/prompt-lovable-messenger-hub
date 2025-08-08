@@ -16,7 +16,8 @@ import {
   Zap,
   Target,
   PlayCircle,
-  Loader2
+  Loader2,
+  BarChart3
 } from "lucide-react";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { useMessagesByDay } from "@/hooks/useMessagesByDay";
@@ -185,7 +186,9 @@ const Dashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {chartLoading ? <div className="h-[300px] flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div> : (
+              {chartLoading ? (
+                <div className="h-[300px] flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
+              ) : messagesByDay && messagesByDay.length > 0 ? (
                 <ResponsiveContainer width="100%" height={300}>
                   <AreaChart data={messagesByDay}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -195,6 +198,12 @@ const Dashboard = () => {
                     <Area type="monotone" dataKey="count" name="Mensagens" stroke="#3b82f6" fill="#dbeafe" fillOpacity={0.8} />
                   </AreaChart>
                 </ResponsiveContainer>
+              ) : (
+                <div className="h-[300px] flex flex-col items-center justify-center text-center text-gray-500">
+                  <BarChart3 className="h-12 w-12 mb-4 text-gray-300" />
+                  <h3 className="font-semibold">Nenhum dado de envio</h3>
+                  <p className="text-sm">As mensagens enviadas nos últimos 30 dias aparecerão aqui.</p>
+                </div>
               )}
             </CardContent>
           </Card>

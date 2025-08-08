@@ -13,12 +13,8 @@ const fetchMessagesByDay = async (userId: string): Promise<MessagesByDay[]> => {
   const { data: result, error } = await supabase
     .from("messages_log")
     .select("sent_at")
+    .eq("user_id", userId)
     .eq("status", "sent")
-    .filter(
-      "campaign_id",
-      "in",
-      `(select id from campaigns where user_id='${userId}')`
-    )
     .gte("sent_at", thirtyDaysAgo)
     .order("sent_at", { ascending: true });
 
