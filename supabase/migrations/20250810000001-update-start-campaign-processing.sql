@@ -10,6 +10,7 @@ DECLARE
     v_contact RECORD;
     v_queue_name TEXT := 'whatsapp_campaigns';
     v_message_json JSONB;
+    v_group_name TEXT;
 BEGIN
     -- 1. Obter detalhes da campanha
     SELECT c.*, i.instance_name, c.scheduled_for, c.sending_method, c.interval_config
@@ -22,18 +23,30 @@ BEGIN
         RETURN 'Erro: Campanha não encontrada.';
     END IF;
 
-    -- 2. Obter IDs dos contatos do grupo
-    -- Esta é uma simplificação. Você pode precisar ajustar a lógica de busca de contatos.
+    -- 2. Obter o nome do grupo a partir dos contatos da campanha
+    -- Pega o primeiro contato da campanha para obter o grupo
+    -- Isso assume que todos os contatos da campanha pertencem ao mesmo grupo
+    SELECT c.tags[1] INTO v_group_name
+    FROM contacts c
+    WHERE c.id = ANY(v_campaign.contact_ids)
+    AND c.user_id = (SELECT auth.uid()::uuid)
+    LIMIT 1;
+
+    IF v_group_name IS NULL THEN
+        RETURN 'Erro: Nenhum contato encontrado na campanha ou grupo não definido.';
+    END IF;
+
+    -- 3. Obter IDs dos contatos do grupo
     SELECT array_agg(id) INTO v_contact_ids
     FROM contacts
     WHERE user_id = (SELECT auth.uid()::uuid)
-    AND tags @> ARRAY[v_campaign.group_name]; -- Ajuste se o nome do campo for diferente
+    AND tags @> ARRAY[v_group_name];
 
     IF v_contact_ids IS NULL OR array_length(v_contact_ids, 1) = 0 THEN
         RETURN 'Erro: Nenhum contato encontrado no grupo da campanha.';
     END IF;
 
-    -- 3. Inserir cada contato na fila pgmq
+    -- 4. Inserir cada contato na fila pgmq
     FOR v_contact IN SELECT id, name, phone FROM contacts WHERE id = ANY(v_contact_ids)
     LOOP
         -- Cria o payload JSON para a mensagem
@@ -56,7 +69,7 @@ BEGIN
         );
     END LOOP;
 
-    -- 4. Atualizar o status da campanha para 'sending'
+    -- 5. Atualizar o status da campanha para 'sending'
     UPDATE campaigns SET status = 'sending' WHERE id = campaign_id_param;
 
     RETURN CONCAT('Fila pgmq criada com sucesso para ', array_length(v_contact_ids, 1), ' mensagens da campanha ', v_campaign.name, '.');
