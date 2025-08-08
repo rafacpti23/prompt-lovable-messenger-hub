@@ -280,10 +280,10 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
             />
             <div className="flex gap-2 mt-2">
               <Button variant="outline" size="sm" onClick={() => insertVariable("{{nome}}")}>
-                Inserir {{nome}}
+                Inserir \{\{nome\}\}
               </Button>
               <Button variant="outline" size="sm" onClick={() => insertVariable("{{telefone}}")}>
-                Inserir {{telefone}}
+                Inserir \{\{telefone\}\}
               </Button>
             </div>
           </div>
