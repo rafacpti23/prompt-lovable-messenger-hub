@@ -72,24 +72,11 @@ const TutorialModal = () => {
                   <h4 className="font-semibold text-green-600 mb-2">1. Supabase pg_cron (Recomendado)</h4>
                   <p className="text-sm mb-3">Execução automática pelo próprio Supabase, sem dependências externas.</p>
                   
-                  <div className="bg-muted p-3 rounded text-xs font-mono">
-                    <p className="font-bold mb-2 text-foreground">SQL para configurar (executar no SQL Editor):</p>
-                    <pre className="whitespace-pre-wrap text-muted-foreground">{`-- Ativar extensões necessárias
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-CREATE EXTENSION IF NOT EXISTS pg_net;
-
--- Criar job que executa a cada minuto
-SELECT cron.schedule(
-    'process-campaigns',
-    '* * * * *',
-    $$
-    SELECT net.http_post(
-        url := 'https://qjqhepntrlgfgpfhpvom.supabase.co/functions/v1/message-sender',
-        headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqcWhlcG50cmxnZmdwZmhwdm9tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU2MjY2MDUsImV4cCI6MjA2MTIwMjYwNX0.S5MdoJyi-xh3aE7hQkciC4haIT_8ObZqAER9RK2iU_w"}'::jsonb,
-        body := '{}'::jsonb
-    );
-    $$
-);`}</pre>
+                  <div className="bg-muted p-3 rounded border-l-4 border-yellow-400">
+                    <p className="font-medium text-foreground">Código de Automação Protegido</p>
+                    <p className="text-muted-foreground text-sm">
+                      Para obter o código SQL para automação via pg_cron, por favor, entre em contato com nosso suporte em: <a href="mailto:contato@ramelseg.com.br" className="text-primary underline">contato@ramelseg.com.br</a>.
+                    </p>
                   </div>
                   
                   <div className="mt-3 text-sm">
