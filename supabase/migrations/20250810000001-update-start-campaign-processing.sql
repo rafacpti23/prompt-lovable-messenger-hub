@@ -49,8 +49,11 @@ BEGIN
             'interval_config', v_campaign.interval_config
         );
 
-        -- Envia a mensagem para a fila
-        PERFORM pgmq_send(v_queue_name, v_message_json);
+        -- Envia a mensagem para a fila usando a função correta da documentação
+        PERFORM pgmq.send(
+            queue_name => v_queue_name,
+            msg        => v_message_json
+        );
     END LOOP;
 
     -- 4. Atualizar o status da campanha para 'sending'

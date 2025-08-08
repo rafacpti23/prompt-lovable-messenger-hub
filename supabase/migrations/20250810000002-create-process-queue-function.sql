@@ -5,9 +5,7 @@ RETURNS TEXT AS $$
 DECLARE
     v_queue_name TEXT := 'whatsapp_campaigns';
     v_limit INT := 5; -- Número de mensagens a processar por chamada
-    v_messages JSONB[] := '{}'::JSONB[];
-    v_message JSONB;
-    v_message_id BIGINT;
+    v_message RECORD;
     v_payload JSONB;
     v_evolution_url TEXT := 'https://api.ramelseg.com.br'; -- Sua URL da Evolution API
     v_evolution_key TEXT := 'd86920ba398e31464c46401214779885'; -- Sua chave da Evolution API
@@ -15,24 +13,17 @@ DECLARE
     v_interval_config JSONB;
     v_interval_range RECORD;
 BEGIN
-    -- Lê as mensagens da fila pgmq
-    -- pgmq_read retorna um array de mensagens
-    SELECT pgmq_read(v_queue_name, v_limit) INTO v_messages;
-
-    -- Se não houver mensagens, sai
-    IF v_messages IS NULL THEN
-        RETURN 'Nenhuma mensagem na fila para processar.';
-    END IF;
-
-    -- Loop através das mensagens lidas
-    FOREACH v_message IN ARRAY v_messages
+    -- Lê as mensagens da fila pgmq usando a função correta da documentação
+    -- pgmq.read retorna um conjunto de registros
+    FOR v_message IN
+        SELECT * FROM pgmq.read(
+            queue_name => v_queue_name,
+            vt         => 30, -- Tempo de visibilidade (30 segundos)
+            qty        => v_limit -- Quantidade de mensagens
+        )
     LOOP
-        -- Extrai o ID da mensagem e o payload
-        v_message_id := v_message->>0;
-        v_payload := v_message->>1;
-
-        -- Marcar a mensagem como 'processing' (opcional, mas bom para rastreamento)
-        -- pgmq não tem um status nativo, então isso seria feito em uma tabela de log separada se necessário.
+        -- Extrai o payload da mensagem
+        v_payload := v_message.message;
 
         -- 1. Obter e aplicar o atraso randômico
         v_interval_config := v_payload->>'interval_config';
@@ -85,10 +76,14 @@ BEGIN
         );
 
         -- 4. Remover a mensagem da fila pgmq após o envio bem-sucedido
-        PERFORM pgmq_ack(v_queue_name, v_message_id);
+        -- Usando a função correta da documentação
+        PERFORM pgmq.delete(
+            queue_name => v_queue_name,
+            msg_id     => v_message.msg_id
+        );
 
     END LOOP;
 
-    RETURN CONCAT('Processamento da fila pgmq concluído. Mensagens processadas: ', array_length(v_messages, 1), '.');
+    RETURN CONCAT('Processamento da fila pgmq concluído. Mensagens processadas: ', v_limit, '.');
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
