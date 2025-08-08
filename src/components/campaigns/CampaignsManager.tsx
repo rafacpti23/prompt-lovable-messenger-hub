@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { toast } from "sonner";
+import { toast } from "sonner"; // Keep this import for sonner
 import CampaignList from "./CampaignList";
 import CampaignForm from "./CampaignForm";
 import CampaignDetailsModal from "./CampaignDetailsModal";
@@ -58,10 +58,8 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
 
       setCampaigns(mapped);
     } catch (error: any) {
-      toast({
-        title: "Erro ao buscar campanhas",
+      toast.error("Erro ao buscar campanhas", {
         description: error.message,
-        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -78,19 +76,15 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     scheduledFor?: string
   ) => {
     if (!user || !newCampaign.name || !selectedInstanceId || !selectedGroup) {
-      toast({
-        title: "Erro",
+      toast.error("Erro", {
         description: "Preencha todos os campos obrigatórios (Instância, Nome, Grupo)",
-        variant: "destructive",
       });
       return;
     }
 
     if (!scheduledFor || new Date(scheduledFor) <= new Date()) {
-      toast({
-        title: "Erro",
+      toast.error("Erro", {
         description: "Data e hora de agendamento devem ser preenchidas e futuras.",
-        variant: "destructive",
       });
       return;
     }
@@ -104,10 +98,8 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
 
       if (contactsError) throw new Error("Erro ao buscar contatos do grupo.");
       if (!contacts || contacts.length === 0) {
-        toast({
-          title: "Grupo vazio",
+        toast.error("Grupo vazio", {
           description: `Nenhum contato encontrado no grupo "${selectedGroup}".`,
-          variant: "destructive",
         });
         return;
       }
@@ -127,8 +119,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       });
       if (error) throw error;
 
-      toast({
-        title: "Sucesso",
+      toast.success("Sucesso", {
         description: "Campanha criada com sucesso! Clique em 'Iniciar' para começar o envio.",
       });
       setNewCampaign({ name: "", message: "" });
@@ -137,10 +128,8 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       setShowCreateForm(false);
       fetchCampaigns();
     } catch (error: any) {
-      toast({
-        title: "Erro ao criar campanha",
+      toast.error("Erro ao criar campanha", {
         description: error.message,
-        variant: "destructive",
       });
     }
   };
@@ -149,10 +138,10 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     try {
       const { error } = await supabase.from("campaigns").delete().eq("id", id);
       if (error) throw error;
-      toast({ title: "Campanha excluída", description: "Campanha removida com sucesso." });
+      toast.success("Campanha excluída", { description: "Campanha removida com sucesso." });
       fetchCampaigns();
     } catch (error: any) {
-      toast({ title: "Erro ao excluir campanha", description: error.message, variant: "destructive" });
+      toast.error("Erro ao excluir campanha", { description: error.message });
     }
   };
 
@@ -161,13 +150,13 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       const { data, error } = await supabase.rpc("start_campaign_processing", { campaign_id_param: id });
       if (error) throw error;
       if (data && typeof data === "string" && data.startsWith("Error")) {
-        toast({ title: "Erro", description: data, variant: "destructive" });
+        toast.error("Erro", { description: data });
       } else {
-        toast({ title: "Campanha iniciada", description: "Fila de mensagens criada e envio iniciado." });
+        toast.success("Campanha iniciada", { description: "Fila de mensagens criada e envio iniciado." });
         fetchCampaigns();
       }
     } catch (error: any) {
-      toast({ title: "Erro ao iniciar campanha", description: error.message, variant: "destructive" });
+      toast.error("Erro ao iniciar campanha", { description: error.message });
     }
   };
 
@@ -175,10 +164,10 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     try {
       const { error } = await supabase.from("campaigns").update({ status: "paused" }).eq("id", id);
       if (error) throw error;
-      toast({ title: "Campanha pausada", description: "Envio da campanha pausado." });
+      toast.info("Campanha pausada", { description: "Envio da campanha pausado." });
       fetchCampaigns();
     } catch (error: any) {
-      toast({ title: "Erro ao pausar campanha", description: error.message, variant: "destructive" });
+      toast.error("Erro ao pausar campanha", { description: error.message });
     }
   };
 
