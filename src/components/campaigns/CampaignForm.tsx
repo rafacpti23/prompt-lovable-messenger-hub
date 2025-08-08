@@ -74,7 +74,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
   const [showMediaRepository, setShowMediaRepository] = useState(false);
   const { subscription } = useUserSubscription();
   const [sendingMethod, setSendingMethod] = useState<'batch' | 'queue'>('batch');
-  const [intervals, setIntervals] = useState<Interval[]>([{ min: 5, max: 10 }]);
+  const [intervals, setIntervals] = useState<Interval[]>([{ min: 3, max: 8 }]);
 
   const canUseQueueSending = subscription?.plan?.enable_queue_sending ?? false;
 
@@ -144,8 +144,150 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {/* ... (código existente para Instância, Fonte de contatos, Grupo, Nome da campanha, Tipo de mensagem, Mídia, Mensagem) ... */}
-          
+          {/* Instância */}
+          <div>
+            <label className="block font-medium mb-2">Instância WhatsApp *</label>
+            <Select value={selectedInstanceId} onValueChange={setSelectedInstanceId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione uma instância" />
+              </SelectTrigger>
+              <SelectContent>
+                {instances.map((instance) => (
+                  <SelectItem key={instance.id} value={instance.id}>
+                    {instance.instance_name} ({instance.status || 'Desconectado'})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Fonte de Contatos */}
+          <div>
+            <label className="block font-medium mb-2">Fonte de Contatos *</label>
+            <div className="flex gap-2">
+              <Button
+                variant={contactSource === "supabase" ? "default" : "outline"}
+                onClick={() => setContactSource("supabase")}
+                type="button"
+              >
+                Contatos do Sistema
+              </Button>
+              <Button
+                variant={contactSource === "google" ? "default" : "outline"}
+                onClick={() => setContactSource("google")}
+                type="button"
+                disabled={!canUseQueueSending}
+              >
+                Planilha Google
+              </Button>
+            </div>
+          </div>
+
+          {/* Grupo */}
+          <div>
+            <label className="block font-medium mb-2">Grupo de Contatos *</label>
+            <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um grupo" />
+              </SelectTrigger>
+              <SelectContent>
+                {(contactSource === "supabase" ? supabaseGroups : googleSheetGroups)
+                  .filter(group => group && group.trim() !== "")
+                  .map((group) => (
+                    <SelectItem key={group} value={group}>
+                      {group}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Nome da Campanha */}
+          <div>
+            <label className="block font-medium mb-2">Nome da Campanha *</label>
+            <Input
+              placeholder="Ex: Promoção de Verão"
+              value={newCampaign.name}
+              onChange={(e) => setNewCampaign({...newCampaign, name: e.target.value})}
+            />
+          </div>
+
+          {/* Tipo de Mensagem */}
+          <div>
+            <label className="block font-medium mb-2">Tipo de Mensagem *</label>
+            <div className="flex gap-2">
+              <Button
+                variant={messageType === "text" ? "default" : "outline"}
+                onClick={() => setMessageType("text")}
+                type="button"
+              >
+                <Brain className="h-4 w-4 mr-2" />
+                Texto
+              </Button>
+              <Button
+                variant={messageType === "image" ? "default" : "outline"}
+                onClick={() => setMessageType("image")}
+                type="button"
+                disabled={!mediaUrl}
+              >
+                <Image className="h-4 w-4 mr-2" />
+                Imagem
+              </Button>
+              <Button
+                variant={messageType === "video" ? "default" : "outline"}
+                onClick={() => setMessageType("video")}
+                type="button"
+                disabled={!mediaUrl}
+              >
+                <Image className="h-4 w-4 mr-2" />
+                Vídeo
+              </Button>
+            </div>
+          </div>
+
+          {/* Mídia */}
+          {messageType !== "text" && (
+            <div>
+              <label className="block font-medium mb-2">Arquivo de Mídia *</label>
+              {mediaUrl ? (
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 p-2 border rounded bg-muted">
+                    <p className="text-sm truncate">{mediaUrl.split('/').pop()}</p>
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={removeMedia}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setShowMediaRepository(true)}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Escolher do Repositório
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Mensagem */}
+          <div>
+            <label className="block font-medium mb-2">Mensagem da Campanha *</label>
+            <Textarea
+              placeholder={`Digite sua mensagem aqui. Use {{nome}} para personalizar com o nome do contato.${messageType === "text" ? "\n\nEx: Olá {{nome}}, temos uma oferta especial para você!" : ""}`}
+              value={newCampaign.message}
+              onChange={(e) => setNewCampaign({...newCampaign, message: e.target.value})}
+              rows={4}
+            />
+            <div className="flex gap-2 mt-2">
+              <Button variant="outline" size="sm" onClick={() => insertVariable("{{nome}}")}>
+                Inserir {{nome}}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => insertVariable("{{telefone}}")}>
+                Inserir {{telefone}}
+              </Button>
+            </div>
+          </div>
+
           {/* Método de Envio */}
           {canUseQueueSending && (
             <div>
