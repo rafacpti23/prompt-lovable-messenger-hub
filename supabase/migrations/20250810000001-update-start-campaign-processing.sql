@@ -1,17 +1,15 @@
 -- Remove a função antiga se ela existir
 DROP FUNCTION IF EXISTS start_campaign_processing(UUID);
 
--- Cria a nova função que popula a tabela de fila
+-- Cria a nova função que usa pgmq para enfileirar mensagens
 CREATE OR REPLACE FUNCTION start_campaign_processing(campaign_id_param UUID)
 RETURNS TEXT AS $$
 DECLARE
     v_campaign RECORD;
     v_contact_ids UUID[];
     v_contact RECORD;
-    v_instance_name TEXT;
-    v_scheduled_for TIMESTAMPTZ;
-    v_sending_method TEXT;
-    v_interval_config JSONB;
+    v_queue_name TEXT := 'whatsapp_campaigns';
+    v_message_json JSONB;
 BEGIN
     -- 1. Obter detalhes da campanha
     SELECT c.*, i.instance_name, c.scheduled_for, c.sending_method, c.interval_config
@@ -35,31 +33,29 @@ BEGIN
         RETURN 'Erro: Nenhum contato encontrado no grupo da campanha.';
     END IF;
 
-    -- 3. Inserir cada contato na fila de mensagens
+    -- 3. Inserir cada contato na fila pgmq
     FOR v_contact IN SELECT id, name, phone FROM contacts WHERE id = ANY(v_contact_ids)
     LOOP
-        INSERT INTO campaign_messages_queue (
-            campaign_id,
-            contact_id,
-            user_id,
-            instance_id,
-            message,
-            phone,
-            scheduled_at
-        ) VALUES (
-            v_campaign.id,
-            v_contact.id,
-            (SELECT auth.uid()::uuid),
-            v_campaign.instance_id,
-            v_campaign.message,
-            v_contact.phone,
-            COALESCE(v_campaign.scheduled_for, NOW())
+        -- Cria o payload JSON para a mensagem
+        v_message_json := jsonb_build_object(
+            'campaign_id', v_campaign.id,
+            'contact_id', v_contact.id,
+            'user_id', (SELECT auth.uid()::uuid),
+            'instance_id', v_campaign.instance_id,
+            'message', v_campaign.message,
+            'phone', v_contact.phone,
+            'scheduled_for', COALESCE(v_campaign.scheduled_for, NOW()),
+            'sending_method', v_campaign.sending_method,
+            'interval_config', v_campaign.interval_config
         );
+
+        -- Envia a mensagem para a fila
+        PERFORM pgmq_send(v_queue_name, v_message_json);
     END LOOP;
 
     -- 4. Atualizar o status da campanha para 'sending'
     UPDATE campaigns SET status = 'sending' WHERE id = campaign_id_param;
 
-    RETURN CONCAT('Fila criada com sucesso para ', array_length(v_contact_ids, 1), ' mensagens da campanha ', v_campaign.name, '.');
+    RETURN CONCAT('Fila pgmq criada com sucesso para ', array_length(v_contact_ids, 1), ' mensagens da campanha ', v_campaign.name, '.');
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
