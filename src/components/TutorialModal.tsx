@@ -50,9 +50,9 @@ const TutorialModal = () => {
                 <p><strong>Sistema:</strong> Usa UTC (Coordinated Universal Time) internamente</p>
                 <p><strong>Brasil:</strong> UTC-3 (Horário de Brasília)</p>
                 <p><strong>Conversão:</strong> O sistema converte automaticamente os horários</p>
-                <div className="bg-blue-50 p-3 rounded border-l-4 border-blue-400">
-                  <p className="font-medium">Exemplo:</p>
-                  <p>20:18 (Brasil) = 23:18 (UTC no banco de dados)</p>
+                <div className="bg-muted p-3 rounded border-l-4 border-blue-400">
+                  <p className="font-medium text-foreground">Exemplo:</p>
+                  <p className="text-muted-foreground">20:18 (Brasil) = 23:18 (UTC no banco de dados)</p>
                 </div>
               </div>
             </section>
@@ -72,9 +72,9 @@ const TutorialModal = () => {
                   <h4 className="font-semibold text-green-600 mb-2">1. Supabase pg_cron (Recomendado)</h4>
                   <p className="text-sm mb-3">Execução automática pelo próprio Supabase, sem dependências externas.</p>
                   
-                  <div className="bg-gray-50 p-3 rounded text-xs font-mono">
-                    <p className="font-bold mb-2">SQL para configurar (executar no SQL Editor):</p>
-                    <pre className="whitespace-pre-wrap">{`-- Ativar extensões necessárias
+                  <div className="bg-muted p-3 rounded text-xs font-mono">
+                    <p className="font-bold mb-2 text-foreground">SQL para configurar (executar no SQL Editor):</p>
+                    <pre className="whitespace-pre-wrap text-muted-foreground">{`-- Ativar extensões necessárias
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_net;
 
