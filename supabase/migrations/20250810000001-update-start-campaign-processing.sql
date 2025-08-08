@@ -11,6 +11,7 @@ DECLARE
     v_queue_name TEXT := 'whatsapp_campaigns';
     v_message_json JSONB;
     v_group_name TEXT;
+    v_scheduled_for TIMESTAMP;
 BEGIN
     -- 1. Obter detalhes da campanha
     SELECT c.*, i.instance_name, c.scheduled_for, c.sending_method, c.interval_config
@@ -24,8 +25,6 @@ BEGIN
     END IF;
 
     -- 2. Obter o nome do grupo a partir dos contatos da campanha
-    -- Pega o primeiro contato da campanha para obter o grupo
-    -- Isso assume que todos os contatos da campanha pertencem ao mesmo grupo
     SELECT c.tags[1] INTO v_group_name
     FROM contacts c
     WHERE c.id = ANY(v_campaign.contact_ids)
@@ -46,7 +45,15 @@ BEGIN
         RETURN 'Erro: Nenhum contato encontrado no grupo da campanha.';
     END IF;
 
-    -- 4. Inserir cada contato na fila pgmq
+    -- 4. Obter o horário agendado da campanha
+    v_scheduled_for := v_campaign.scheduled_for;
+    
+    -- Se não houver horário agendado, usar o horário atual
+    IF v_scheduled_for IS NULL THEN
+        v_scheduled_for := NOW();
+    END IF;
+
+    -- 5. Inserir cada contato na fila pgmq com o horário agendado
     FOR v_contact IN SELECT id, name, phone FROM contacts WHERE id = ANY(v_contact_ids)
     LOOP
         -- Cria o payload JSON para a mensagem
@@ -57,21 +64,21 @@ BEGIN
             'instance_id', v_campaign.instance_id,
             'message', v_campaign.message,
             'phone', v_contact.phone,
-            'scheduled_for', COALESCE(v_campaign.scheduled_for, NOW()),
+            'scheduled_for', v_scheduled_for, -- Inclui o horário agendado
             'sending_method', v_campaign.sending_method,
             'interval_config', v_campaign.interval_config
         );
 
-        -- Envia a mensagem para a fila usando a função correta da documentação
+        -- Envia a mensagem para a fila
         PERFORM pgmq.send(
             queue_name => v_queue_name,
             msg        => v_message_json
         );
     END LOOP;
 
-    -- 5. Atualizar o status da campanha para 'sending'
+    -- 6. Atualizar o status da campanha para 'sending'
     UPDATE campaigns SET status = 'sending' WHERE id = campaign_id_param;
 
-    RETURN CONCAT('Fila pgmq criada com sucesso para ', array_length(v_contact_ids, 1), ' mensagens da campanha ', v_campaign.name, '.');
+    RETURN CONCAT('Fila pgmq criada com sucesso para ', array_length(v_contact_ids, 1), ' mensagens da campanha ', v_campaign.name, '. Agendado para: ', v_scheduled_for);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
