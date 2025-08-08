@@ -6,8 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const MESSAGES_PER_RUN = 5; // Processar até 5 mensagens por invocação
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -28,43 +26,66 @@ serve(async (req) => {
       throw new Error('As credenciais da Evolution API não estão configuradas')
     }
 
-    // 1. Ler mensagens da fila pgmq usando a função RPC correta
-    console.log("Lendo mensagens da fila...")
-    const { data: messages, error: readError } = await supabaseClient.rpc('read_from_message_queue', {
-      p_count: MESSAGES_PER_RUN
-    })
+    // Configurações do worker
+    const MAX_MESSAGES_PER_RUN = 50 // Limite máximo por execução para evitar timeouts
+    const MAX_PROCESSING_TIME = 180000 // 3 minutos de tempo máximo de processamento
+    const startTime = Date.now()
+    let totalProcessed = 0
 
-    if (readError) {
-      console.error("Erro ao ler da fila:", readError)
-      throw new Error(`Failed to read from message queue: ${readError.message}`)
-    }
+    console.log(`Iniciando processamento com limite de ${MAX_MESSAGES_PER_RUN} mensagens ou ${MAX_PROCESSING_TIME/1000} segundos...`)
 
-    if (!messages || messages.length === 0) {
-      console.log("Nenhuma mensagem na fila para processar.")
-      return new Response(JSON.stringify({ message: "No messages in queue to process." }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    // Loop contínuo enquanto houver mensagens e tempo
+    while (totalProcessed < MAX_MESSAGES_PER_RUN && (Date.now() - startTime) < MAX_PROCESSING_TIME) {
+      // 1. Ler mensagens da fila pgmq
+      console.log("Lendo mensagens da fila...")
+      const { data: messages, error: readError } = await supabaseClient.rpc('read_from_message_queue', {
+        p_count: 10 // Pega 10 mensagens de cada vez
       })
-    }
 
-    console.log(`Processando ${messages.length} mensagens da fila...`)
-
-    // 2. Processar cada mensagem
-    for (const msg of messages) {
-      console.log(`Processando mensagem ID: ${msg.msg_id}, Payload:`, msg.payload)
-      
-      // Verificar se a mensagem está agendada para o futuro
-      const scheduledFor = new Date(msg.payload.scheduled_for)
-      const now = new Date()
-      
-      if (now < scheduledFor) {
-        console.log(`Mensagem agendada para ${scheduledFor} pulada (ainda não é hora)`)
-        continue // Pula esta mensagem, será processada mais tarde
+      if (readError) {
+        console.error("Erro ao ler da fila:", readError)
+        throw new Error(`Failed to read from message queue: ${readError.message}`)
       }
 
-      await processMessage(msg.payload, msg.msg_id, supabaseClient, EVOLUTION_API_URL, EVOLUTION_API_KEY)
+      if (!messages || messages.length === 0) {
+        console.log("Nenhuma mensagem na fila para processar. Encerrando.")
+        break // Sai do loop se não houver mais mensagens
+      }
+
+      console.log(`Processando ${messages.length} mensagens da fila...`)
+
+      // 2. Processar cada mensagem
+      for (const msg of messages) {
+        // Verificar limite de tempo
+        if (Date.now() - startTime > MAX_PROCESSING_TIME) {
+          console.log("Tempo máximo de processamento atingido. Encerrando.")
+          break
+        }
+
+        // Verificar limite de mensagens
+        if (totalProcessed >= MAX_MESSAGES_PER_RUN) {
+          console.log(`Limite de ${MAX_MESSAGES_PER_RUN} mensagens atingido. Encerrando.`)
+          break
+        }
+
+        console.log(`Processando mensagem ID: ${msg.msg_id}, Payload:`, msg.payload)
+        
+        // Verificar se a mensagem está agendada para o futuro
+        const scheduledFor = new Date(msg.payload.scheduled_for)
+        const now = new Date()
+        
+        if (now < scheduledFor) {
+          console.log(`Mensagem agendada para ${scheduledFor} pulada (ainda não é hora)`)
+          continue // Pula esta mensagem, será processada mais tarde
+        }
+
+        await processMessage(msg.payload, msg.msg_id, supabaseClient, EVOLUTION_API_URL, EVOLUTION_API_KEY)
+        totalProcessed++
+      }
     }
 
-    return new Response(JSON.stringify({ message: `Processed ${messages.length} messages.` }), {
+    console.log(`Processamento concluído. Total de mensagens processadas: ${totalProcessed}`)
+    return new Response(JSON.stringify({ message: `Processed ${totalProcessed} messages.` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
 
