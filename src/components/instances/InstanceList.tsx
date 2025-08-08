@@ -64,7 +64,8 @@ export default function InstanceList({ instances, loading, onShowQr, onConnect, 
         qrBase64={qrModal.qrBase64}
         onOpenChange={(open) => setQrModal((qrm) => ({ ...qrm, open }))}
       />
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"> {/* Adjusted grid for more columns */}
+      {/* Adjusted grid for more columns */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {loading ? (
           <div className="text-center py-12 text-gray-500 col-span-full">Carregando instâncias...</div>
         ) : instances.length === 0 ? (
@@ -73,35 +74,45 @@ export default function InstanceList({ instances, loading, onShowQr, onConnect, 
           </div>
         ) : (
           instances.map((instance) => (
-            <Card key={instance.id} className="p-4 bg-card rounded-2xl shadow-xl max-w-xs mx-auto w-full"> {/* Added max-w-xs and mx-auto for centering */}
-              <CardContent className="p-0 flex flex-col gap-3"> {/* Reduced gap */}
+            {/* Added max-w-xs and mx-auto for centering */}
+            <Card key={instance.id} className="p-4 bg-card rounded-2xl shadow-xl max-w-xs mx-auto w-full">
+              {/* Reduced gap */}
+              <CardContent className="p-0 flex flex-col gap-3">
                 {/* Top section: Instance Name and Settings Icon */}
                 <div className="flex items-center justify-between w-full">
-                  <span className="font-bold text-lg text-foreground truncate">{instance.instance_name}</span> {/* Smaller font */}
+                  {/* Smaller font */}
+                  <span className="font-bold text-lg text-foreground truncate">{instance.instance_name}</span>
                   <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground ml-auto">
-                    <Settings className="h-4 w-4" /> {/* Smaller icon */}
+                    {/* Smaller icon */}
+                    <Settings className="h-4 w-4" />
                   </Button>
                 </div>
 
                 {/* Profile Info and Status */}
-                <div className="flex items-center space-x-3 w-full"> {/* Reduced space-x */}
-                  <Avatar className="h-14 w-14 rounded-full border-2 border-primary"> {/* Smaller avatar */}
+                {/* Reduced space-x */}
+                <div className="flex items-center space-x-3 w-full">
+                  {/* Smaller avatar */}
+                  <Avatar className="h-14 w-14 rounded-full border-2 border-primary">
                     <AvatarImage src={instance.profilePictureUrl || undefined} alt={instance.profileName || instance.instance_name} />
+                    {/* Smaller fallback icon */}
                     <AvatarFallback>
-                      <MessageSquare className="h-7 w-7 text-green-600" /> {/* Smaller fallback icon */}
+                      <MessageSquare className="h-7 w-7 text-green-600" />
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col flex-1 min-w-0">
                     {instance.profileName && (
-                      <p className="font-bold text-base text-foreground truncate">{instance.profileName}</p> {/* Smaller font */}
+                      {/* Smaller font */}
+                      <p className="font-bold text-base text-foreground truncate">{instance.profileName}</p>
                     )}
                     {instance.phone_number && (
-                      <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5"> {/* Smaller font, reduced mt */}
+                      {/* Smaller font, reduced mt */}
+                      <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
                         <Phone className="h-3 w-3" /> {instance.phone_number}
                       </p>
                     )}
                     {instance.profileStatus && (
-                      <p className="text-xs text-gray-400 italic mt-0.5 truncate">"{instance.profileStatus}"</p> {/* Reduced mt */}
+                      {/* Reduced mt */}
+                      <p className="text-xs text-gray-400 italic mt-0.5 truncate">"{instance.profileStatus}"</p>
                     )}
                   </div>
                 </div>
@@ -119,22 +130,26 @@ export default function InstanceList({ instances, loading, onShowQr, onConnect, 
                     type={showToken[instance.id] ? "text" : "password"}
                     value="************************" // Placeholder for token
                     readOnly
-                    className="pr-20 bg-muted/50 border-border text-foreground text-xs h-8" {/* Smaller text, reduced height */}
+                    {/* Smaller text, reduced height */}
+                    className="pr-20 bg-muted/50 border-border text-foreground text-xs h-8"
                   />
-                  <div className="absolute right-1 flex items-center space-x-0.5"> {/* Reduced space-x */}
+                  {/* Reduced space-x */}
+                  <div className="absolute right-1 flex items-center space-x-0.5">
+                    {/* Smaller buttons */}
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => handleCopyToken("some-secret-token-here")}
-                      className="h-6 w-6 text-muted-foreground hover:text-foreground" {/* Smaller buttons */}
+                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
                     >
                       <Copy className="h-3 w-3" />
                     </Button>
+                    {/* Smaller buttons */}
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => setShowToken(prev => ({ ...prev, [instance.id]: !prev[instance.id] }))}
-                      className="h-6 w-6 text-muted-foreground hover:text-foreground" {/* Smaller buttons */}
+                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
                     >
                       {showToken[instance.id] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
                     </Button>
@@ -142,7 +157,8 @@ export default function InstanceList({ instances, loading, onShowQr, onConnect, 
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex flex-wrap justify-center gap-2 mt-2 w-full"> {/* Centered buttons, reduced mt */}
+                {/* Centered buttons, reduced mt */}
+                <div className="flex flex-wrap justify-center gap-2 mt-2 w-full">
                   {(instance.status === "close" ||
                     instance.status === "disconnected") && (
                     <Button
