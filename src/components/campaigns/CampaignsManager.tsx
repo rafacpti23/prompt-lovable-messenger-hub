@@ -29,6 +29,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(false);
   const [detailsCampaignId, setDetailsCampaignId] = useState<string | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   // Buscar campanhas do usuário
   const fetchCampaigns = async () => {
@@ -131,6 +132,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       setNewCampaign({ name: "", message: "" });
       setSelectedGroup("");
       setMediaUrl(null);
+      setShowCreateForm(false);
       fetchCampaigns();
     } catch (error: any) {
       toast({
@@ -180,59 +182,74 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Gerenciar Campanhas</h2>
-      <CampaignForm
-        newCampaign={newCampaign}
-        setNewCampaign={setNewCampaign}
-        mediaUrl={mediaUrl}
-        setMediaUrl={setMediaUrl}
-        contactSource="supabase"
-        setContactSource={() => {}}
-        googleConnected={false}
-        googleSheetName={null}
-        handleConnectGoogle={() => {}}
-        setGoogleConnected={() => {}}
-        setGoogleSheetName={() => {}}
-        supabaseGroups={contactGroups}
-        googleSheetGroups={[]}
-        selectedGroup={selectedGroup}
-        setSelectedGroup={setSelectedGroup}
-        createCampaign={createCampaign}
-        instances={[]} // Você pode integrar a lista de instâncias aqui se quiser
-        selectedInstanceId={selectedInstanceId}
-        setSelectedInstanceId={setSelectedInstanceId}
-      />
-      {loading ? (
-        <div className="text-center py-12 text-gray-500">Carregando campanhas...</div>
-      ) : (
-        <CampaignList
-          campaigns={campaigns}
-          deleteCampaign={deleteCampaign}
-          getStatusColor={(status) => {
-            switch (status) {
-              case "sending": return "bg-blue-100 text-blue-800";
-              case "scheduled": return "bg-yellow-100 text-yellow-800";
-              case "completed": return "bg-green-100 text-green-800";
-              case "paused": return "bg-orange-100 text-orange-800";
-              case "draft": return "bg-gray-100 text-gray-800";
-              default: return "bg-gray-100 text-gray-800";
-            }
-          }}
-          getStatusText={(status) => {
-            switch (status) {
-              case "sending": return "Enviando";
-              case "scheduled": return "Agendada";
-              case "completed": return "Concluída";
-              case "paused": return "Pausada";
-              case "draft": return "Rascunho";
-              default: return status;
-            }
-          }}
-          onStartCampaign={startCampaign}
-          onPauseCampaign={pauseCampaign}
-          onShowDetails={setDetailsCampaignId}
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Gerenciar Campanhas</h2>
+        <button
+          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
+          onClick={() => setShowCreateForm(true)}
+        >
+          Criar Nova Campanha
+        </button>
+      </div>
+
+      {showCreateForm ? (
+        <CampaignForm
+          newCampaign={newCampaign}
+          setNewCampaign={setNewCampaign}
+          mediaUrl={mediaUrl}
+          setMediaUrl={setMediaUrl}
+          contactSource="supabase"
+          setContactSource={() => {}}
+          googleConnected={false}
+          googleSheetName={null}
+          handleConnectGoogle={() => {}}
+          setGoogleConnected={() => {}}
+          setGoogleSheetName={() => {}}
+          supabaseGroups={contactGroups}
+          googleSheetGroups={[]}
+          selectedGroup={selectedGroup}
+          setSelectedGroup={setSelectedGroup}
+          createCampaign={createCampaign}
+          instances={[]} // Integre a lista de instâncias se desejar
+          selectedInstanceId={selectedInstanceId}
+          setSelectedInstanceId={setSelectedInstanceId}
         />
+      ) : (
+        <>
+          {loading ? (
+            <div className="text-center py-12 text-gray-500">Carregando campanhas...</div>
+          ) : (
+            <CampaignList
+              campaigns={campaigns}
+              deleteCampaign={deleteCampaign}
+              getStatusColor={(status) => {
+                switch (status) {
+                  case "sending": return "bg-blue-100 text-blue-800";
+                  case "scheduled": return "bg-yellow-100 text-yellow-800";
+                  case "completed": return "bg-green-100 text-green-800";
+                  case "paused": return "bg-orange-100 text-orange-800";
+                  case "draft": return "bg-gray-100 text-gray-800";
+                  default: return "bg-gray-100 text-gray-800";
+                }
+              }}
+              getStatusText={(status) => {
+                switch (status) {
+                  case "sending": return "Enviando";
+                  case "scheduled": return "Agendada";
+                  case "completed": return "Concluída";
+                  case "paused": return "Pausada";
+                  case "draft": return "Rascunho";
+                  default: return status;
+                }
+              }}
+              onStartCampaign={startCampaign}
+              onPauseCampaign={pauseCampaign}
+              onShowDetails={setDetailsCampaignId}
+            />
+          )}
+        </>
       )}
+
       <CampaignDetailsModal
         campaignId={detailsCampaignId}
         open={!!detailsCampaignId}
