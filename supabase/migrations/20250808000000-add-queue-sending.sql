@@ -82,3 +82,24 @@ BEGIN
   END IF;
 END;
 $$;
+
+-- Funções auxiliares para a Edge Function interagir com a fila
+CREATE OR REPLACE FUNCTION read_from_message_queue(p_count INTEGER)
+RETURNS TABLE(msg_id BIGINT, payload JSONB)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT message_id, payload::jsonb
+  FROM mq.read('message_queue', 300, p_count); -- 300s de timeout de visibilidade
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION ack_message(p_msg_id BIGINT)
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  PERFORM mq.ack(p_msg_id);
+END;
+$$;
