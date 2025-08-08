@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, Plus, Edit, Trash2 } from "lucide-react";
+import { CreditCard, Plus, Check, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -16,6 +15,7 @@ interface Plan {
   credits: number;
   duration_days: number;
   is_active: boolean;
+  enable_queue_sending: boolean;
   created_at: string;
 }
 
@@ -28,7 +28,8 @@ const PlanManagement: React.FC = () => {
     name: "",
     price: 0,
     credits: 0,
-    duration_days: 30
+    duration_days: 30,
+    enable_queue_sending: false,
   });
 
   useEffect(() => {
@@ -73,7 +74,8 @@ const PlanManagement: React.FC = () => {
           price: newPlan.price,
           credits: newPlan.credits,
           duration_days: newPlan.duration_days,
-          price_per_message: newPlan.price / newPlan.credits
+          price_per_message: newPlan.price / newPlan.credits,
+          enable_queue_sending: newPlan.enable_queue_sending,
         })
         .select()
         .single();
@@ -81,7 +83,7 @@ const PlanManagement: React.FC = () => {
       if (error) throw error;
 
       setPlans([data, ...plans]);
-      setNewPlan({ name: "", price: 0, credits: 0, duration_days: 30 });
+      setNewPlan({ name: "", price: 0, credits: 0, duration_days: 30, enable_queue_sending: false });
       
       toast({
         title: "Sucesso",
@@ -112,6 +114,32 @@ const PlanManagement: React.FC = () => {
       toast({
         title: "Sucesso",
         description: `Plano ${!isActive ? 'ativado' : 'desativado'} com sucesso!`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar plano",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const toggleQueueSending = async (planId: string, enabled: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('plans')
+        .update({ enable_queue_sending: enabled })
+        .eq('id', planId);
+
+      if (error) throw error;
+
+      setPlans(plans.map(plan => 
+        plan.id === planId ? { ...plan, enable_queue_sending: enabled } : plan
+      ));
+
+      toast({
+        title: "Sucesso",
+        description: `Envio por fila ${enabled ? 'habilitado' : 'desabilitado'} para o plano.`,
       });
     } catch (error: any) {
       toast({
@@ -192,6 +220,18 @@ const PlanManagement: React.FC = () => {
                 onChange={(e) => setNewPlan({ ...newPlan, duration_days: parseInt(e.target.value) || 30 })}
               />
             </div>
+
+            <div className="col-span-2 flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="enable-queue-sending"
+                checked={newPlan.enable_queue_sending}
+                onChange={(e) => setNewPlan({ ...newPlan, enable_queue_sending: e.target.checked })}
+              />
+              <Label htmlFor="enable-queue-sending" className="mb-0 cursor-pointer">
+                Habilitar envio por fila avançada (intervalos aleatórios)
+              </Label>
+            </div>
           </div>
           
           <Button onClick={createPlan}>
@@ -219,6 +259,9 @@ const PlanManagement: React.FC = () => {
                 <div className="text-xs text-gray-400">
                   R$ {(plan.price / plan.credits).toFixed(4)} por mensagem
                 </div>
+                <div className="text-xs text-gray-400 mt-1">
+                  Envio por fila avançada: {plan.enable_queue_sending ? "Sim" : "Não"}
+                </div>
               </div>
               
               <div className="flex items-center gap-2">
@@ -228,6 +271,14 @@ const PlanManagement: React.FC = () => {
                   onClick={() => togglePlanStatus(plan.id, plan.is_active)}
                 >
                   {plan.is_active ? "Desativar" : "Ativar"}
+                </Button>
+                <Button
+                  variant={plan.enable_queue_sending ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => toggleQueueSending(plan.id, !plan.enable_queue_sending)}
+                >
+                  {plan.enable_queue_sending ? <Check className="mr-1" /> : null}
+                  {plan.enable_queue_sending ? "Fila Ativa" : "Fila Inativa"}
                 </Button>
               </div>
             </div>
