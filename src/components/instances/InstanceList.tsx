@@ -1,12 +1,12 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { QrCode, Power, Trash2, MessageSquare, UserCircle2, Phone, Settings, Copy, Eye, EyeOff, Users as UsersIcon, MessageSquare as MessageSquareIcon } from "lucide-react"; // Import necessary icons
+import { QrCode, Power, Trash2, MessageSquare, UserCircle2, Phone, Settings, Copy, Eye, EyeOff } from "lucide-react";
 import InstanceQrModal from "./InstanceQrModal";
 import { useState } from "react";
 import { type Instance } from "@/hooks/useManageInstances";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Input } from "@/components/ui/input"; // Import Input for the masked field
+import { Input } from "@/components/ui/input";
 
 interface Props {
   instances: Instance[];
@@ -64,95 +64,92 @@ export default function InstanceList({ instances, loading, onShowQr, onConnect, 
         qrBase64={qrModal.qrBase64}
         onOpenChange={(open) => setQrModal((qrm) => ({ ...qrm, open }))}
       />
-      <div className="grid gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"> {/* Adjusted grid for more columns */}
         {loading ? (
-          <div className="text-center py-12 text-gray-500">Carregando instâncias...</div>
+          <div className="text-center py-12 text-gray-500 col-span-full">Carregando instâncias...</div>
         ) : instances.length === 0 ? (
-          <div className="text-center py-12 text-gray-400">
+          <div className="text-center py-12 text-gray-400 col-span-full">
             Nenhuma instância cadastrada.
           </div>
         ) : (
           instances.map((instance) => (
-            <Card key={instance.id} className="p-4 bg-card rounded-2xl shadow-xl"> {/* Adjusted card styling */}
-              <CardContent className="p-0 flex flex-col gap-4"> {/* Removed md:flex-row for better vertical stacking */}
+            <Card key={instance.id} className="p-4 bg-card rounded-2xl shadow-xl max-w-xs mx-auto w-full"> {/* Added max-w-xs and mx-auto for centering */}
+              <CardContent className="p-0 flex flex-col gap-3"> {/* Reduced gap */}
                 {/* Top section: Instance Name and Settings Icon */}
                 <div className="flex items-center justify-between w-full">
-                  <span className="font-bold text-xl text-foreground">{instance.instance_name}</span>
-                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-                    <Settings className="h-5 w-5" />
+                  <span className="font-bold text-lg text-foreground truncate">{instance.instance_name}</span> {/* Smaller font */}
+                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground ml-auto">
+                    <Settings className="h-4 w-4" /> {/* Smaller icon */}
                   </Button>
                 </div>
 
-                {/* Token/Password Field (Placeholder) */}
+                {/* Profile Info and Status */}
+                <div className="flex items-center space-x-3 w-full"> {/* Reduced space-x */}
+                  <Avatar className="h-14 w-14 rounded-full border-2 border-primary"> {/* Smaller avatar */}
+                    <AvatarImage src={instance.profilePictureUrl || undefined} alt={instance.profileName || instance.instance_name} />
+                    <AvatarFallback>
+                      <MessageSquare className="h-7 w-7 text-green-600" /> {/* Smaller fallback icon */}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col flex-1 min-w-0">
+                    {instance.profileName && (
+                      <p className="font-bold text-base text-foreground truncate">{instance.profileName}</p> {/* Smaller font */}
+                    )}
+                    {instance.phone_number && (
+                      <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5"> {/* Smaller font, reduced mt */}
+                        <Phone className="h-3 w-3" /> {instance.phone_number}
+                      </p>
+                    )}
+                    {instance.profileStatus && (
+                      <p className="text-xs text-gray-400 italic mt-0.5 truncate">"{instance.profileStatus}"</p> {/* Reduced mt */}
+                    )}
+                  </div>
+                </div>
+
+                {/* Status Badge */}
+                <div className="w-full text-center">
+                  <Badge className={getStatusColor(instance.status)}>
+                    {getStatusText(instance.status)}
+                  </Badge>
+                </div>
+
+                {/* Token/Password Field */}
                 <div className="relative flex items-center w-full">
                   <Input
                     type={showToken[instance.id] ? "text" : "password"}
                     value="************************" // Placeholder for token
                     readOnly
-                    className="pr-20 bg-muted/50 border-border text-foreground"
+                    className="pr-20 bg-muted/50 border-border text-foreground text-xs h-8" {/* Smaller text, reduced height */}
                   />
-                  <div className="absolute right-2 flex items-center space-x-1">
+                  <div className="absolute right-1 flex items-center space-x-0.5"> {/* Reduced space-x */}
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => handleCopyToken("some-secret-token-here")} // Replace with actual token if available and safe
-                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      onClick={() => handleCopyToken("some-secret-token-here")}
+                      className="h-6 w-6 text-muted-foreground hover:text-foreground" {/* Smaller buttons */}
                     >
-                      <Copy className="h-4 w-4" />
+                      <Copy className="h-3 w-3" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => setShowToken(prev => ({ ...prev, [instance.id]: !prev[instance.id] }))}
-                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      className="h-6 w-6 text-muted-foreground hover:text-foreground" {/* Smaller buttons */}
                     >
-                      {showToken[instance.id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showToken[instance.id] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
                     </Button>
                   </div>
                 </div>
 
-                {/* Profile Info and Stats */}
-                <div className="flex items-start space-x-4 w-full">
-                  <Avatar className="h-20 w-20 rounded-full border-2 border-primary"> {/* Larger avatar */}
-                    <AvatarImage src={instance.profilePictureUrl || undefined} alt={instance.profileName || instance.instance_name} />
-                    <AvatarFallback>
-                      <MessageSquare className="h-10 w-10 text-green-600" /> {/* Larger fallback icon */}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex flex-col flex-1 min-w-0">
-                    {instance.profileName && (
-                      <p className="font-bold text-xl text-foreground truncate">{instance.profileName}</p>
-                    )}
-                    {instance.phone_number && (
-                      <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-                        <Phone className="h-4 w-4" /> {instance.phone_number}
-                      </p>
-                    )}
-                    {instance.profileStatus && (
-                      <p className="text-xs text-gray-400 italic mt-1 truncate">"{instance.profileStatus}"</p>
-                    )}
-                  </div>
-                  {/* Placeholder for stats like in the screenshot */}
-                  <div className="flex flex-col items-end space-y-2 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <UsersIcon className="h-4 w-4" />
-                      <span>{Math.floor(Math.random() * 5000) + 1000}</span> {/* Random placeholder */}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <MessageSquareIcon className="h-4 w-4" />
-                      <span>{Math.floor(Math.random() * 200000) + 10000}</span> {/* Random placeholder */}
-                    </div>
-                  </div>
-                </div>
-
                 {/* Action Buttons */}
-                <div className="flex flex-wrap justify-end gap-2 mt-4 w-full">
+                <div className="flex flex-wrap justify-center gap-2 mt-2 w-full"> {/* Centered buttons, reduced mt */}
                   {(instance.status === "close" ||
                     instance.status === "disconnected") && (
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => onShowQr(instance, setQrModal)}
+                      className="flex-1 min-w-[100px]"
                     >
                       <QrCode className="h-4 w-4 mr-2" />
                       QR Code
@@ -162,6 +159,7 @@ export default function InstanceList({ instances, loading, onShowQr, onConnect, 
                     variant="outline"
                     size="sm"
                     onClick={() => onConnect(instance)}
+                    className="flex-1 min-w-[100px]"
                   >
                     <Power className="h-4 w-4 mr-2" />
                     {["connected", "open"].includes(instance.status ?? "")
@@ -172,6 +170,7 @@ export default function InstanceList({ instances, loading, onShowQr, onConnect, 
                     variant="destructive"
                     size="sm"
                     onClick={() => onDelete(instance)}
+                    className="flex-1 min-w-[100px]"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
