@@ -39,7 +39,7 @@ interface CampaignFormProps {
   googleSheetGroups: string[];
   selectedGroup: string;
   setSelectedGroup: (g: string) => void;
-  createCampaign: (sendingMethod: 'batch' | 'queue', intervalConfig?: Interval[]) => void;
+  createCampaign: (sendingMethod: 'batch' | 'queue', intervalConfig?: Interval[], scheduledFor?: string) => void;
   instances: Instance[];
   selectedInstanceId: string;
   setSelectedInstanceId: (id: string) => void;
@@ -75,6 +75,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
   const { subscription } = useUserSubscription();
   const [sendingMethod, setSendingMethod] = useState<'batch' | 'queue'>('batch');
   const [intervals, setIntervals] = useState<Interval[]>([{ min: 3, max: 8 }]);
+  const [scheduledFor, setScheduledFor] = useState<string>("");
 
   const canUseQueueSending = subscription?.plan?.enable_queue_sending ?? false;
 
@@ -110,7 +111,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
   };
 
   const insertVariable = (variable: string) => {
-    const textarea = document.querySelector('textarea[placeholder="Mensagem da campanha"]') as HTMLTextAreaElement;
+    const textarea = document.querySelector('textarea[placeholder^="Digite sua mensagem"]') as HTMLTextAreaElement;
     if (textarea) {
       const start = textarea.selectionStart;
       const end = textarea.selectionEnd;
@@ -126,10 +127,12 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
   };
 
   const isFormValid = () => {
+    const hasScheduledFor = scheduledFor && new Date(scheduledFor) > new Date();
     return (
       selectedInstanceId &&
       newCampaign.name.trim() &&
       selectedGroup &&
+      hasScheduledFor &&
       (messageType === "text" ? newCampaign.message.trim() : mediaUrl)
     );
   };
@@ -200,6 +203,17 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
                   ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Data e Hora de Agendamento */}
+          <div>
+            <label className="block font-medium mb-2">Data e Hora de Agendamento *</label>
+            <Input
+              type="datetime-local"
+              value={scheduledFor}
+              onChange={(e) => setScheduledFor(e.target.value)}
+              min={new Date().toISOString().slice(0,16)}
+            />
           </div>
 
           {/* Nome da Campanha */}
@@ -350,7 +364,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
 
           {/* Botão criar campanha */}
           <Button 
-            onClick={() => createCampaign(sendingMethod, sendingMethod === 'queue' ? intervals : undefined)}
+            onClick={() => createCampaign(sendingMethod, sendingMethod === 'queue' ? intervals : undefined, scheduledFor)}
             disabled={!isFormValid()}
             className={!isFormValid() ? "opacity-50 cursor-not-allowed" : ""}
           >
@@ -360,7 +374,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
           
           {!isFormValid() && (
             <p className="text-sm text-red-500">
-              * Campos obrigatórios: Instância, Nome, Grupo, {messageType === "text" ? "Mensagem" : "Arquivo de mídia"}
+              * Campos obrigatórios: Instância, Nome, Grupo, Data e Hora de Agendamento, {messageType === "text" ? "Mensagem" : "Arquivo de mídia"}
             </p>
           )}
         </div>
