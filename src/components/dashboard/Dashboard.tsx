@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ import { useBilling } from "@/hooks/useBilling";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import TutorialModal from "@/components/TutorialModal";
+import { useRecentActivities } from "@/hooks/useRecentActivities";
 
 const Dashboard = () => {
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
@@ -33,27 +34,7 @@ const Dashboard = () => {
   const { data: campaigns, isLoading: campaignsLoading } = useCampaigns();
   const { subscription } = useBilling();
   const [isDispatching, setIsDispatching] = useState(false);
-  const [recentActivities, setRecentActivities] = useState<any[]>([]);
-  const [activitiesLoading, setActivitiesLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchRecentActivities = async () => {
-      setActivitiesLoading(true);
-      const { data, error } = await supabase
-        .from('messages_log')
-        .select('*, contact:contacts(name)')
-        .order('sent_at', { ascending: false })
-        .limit(4);
-
-      if (error) {
-        console.error("Error fetching recent activities:", error);
-      } else {
-        setRecentActivities(data || []);
-      }
-      setActivitiesLoading(false);
-    };
-    fetchRecentActivities();
-  }, []);
+  const { data: recentActivities, isLoading: activitiesLoading } = useRecentActivities();
 
   const handleManualDispatch = async () => {
     setIsDispatching(true);
@@ -240,7 +221,7 @@ const Dashboard = () => {
             <CardContent>
               {activitiesLoading ? <div className="h-[200px] flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div> : (
                 <div className="space-y-4">
-                  {recentActivities.map((activity) => (
+                  {(recentActivities || []).map((activity) => (
                     <div key={activity.id} className="flex items-center gap-4 p-3 rounded-lg border dark:border-gray-700">
                       <div className={`p-2 rounded-full ${activity.status === "sent" ? "bg-green-100 dark:bg-green-900/50" : "bg-red-100 dark:bg-red-900/50"}`}>
                         {activity.status === "sent" ? 

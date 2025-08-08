@@ -34,30 +34,38 @@ export function useCampaigns() {
   useEffect(() => {
     if (!user) return;
 
-    const channel = supabase
-      .channel('public:campaigns')
+    const realtimeChannel = supabase
+      .channel('realtime-campaign-progress')
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'campaigns', filter: `user_id=eq.${user.id}` },
         (payload) => {
-          // Notificar quando a campanha for concluída
           if (payload.old.status !== 'completed' && payload.new.status === 'completed') {
             sonner.success("Campanha Concluída!", {
               description: `A campanha "${payload.new.name}" foi finalizada.`,
               icon: <Bell className="h-4 w-4" />,
             });
           }
-          
-          // Atualizar os dados na tela
           queryClient.invalidateQueries({ queryKey: ['campaigns', user.id] });
           queryClient.invalidateQueries({ queryKey: ['dashboardStats', user.id] });
-          queryClient.invalidateQueries({ queryKey: ['userSubscription', user.id] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages_log', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          // A new message was logged, so campaign progress has changed.
+          // We invalidate multiple queries to keep the dashboard in sync.
+          queryClient.invalidateQueries({ queryKey: ['campaigns', user.id] });
+          queryClient.invalidateQueries({ queryKey: ['dashboardStats', user.id] });
+          queryClient.invalidateQueries({ queryKey: ['recentActivities', user.id] });
+          queryClient.invalidateQueries({ queryKey: ['messagesByDay', user.id] });
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(realtimeChannel);
     };
   }, [user, queryClient]);
 
