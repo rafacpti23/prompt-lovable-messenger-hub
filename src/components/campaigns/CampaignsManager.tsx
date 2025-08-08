@@ -1,7 +1,20 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { toast } from "sonner";
+import CampaignList from "./CampaignList";
+import CampaignForm from "./CampaignForm";
+import CampaignDetailsModal from "./CampaignDetailsModal";
+
+interface Campaign {
+  id: string;
+  name: string;
+  message: string;
+  status: string;
+  sent: number;
+  total: number;
+  scheduled_for: string | null;
+}
 
 interface CampaignsManagerProps {
   contactGroups: string[];
@@ -13,6 +26,48 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
   const [selectedInstanceId, setSelectedInstanceId] = useState<string>("");
   const [selectedGroup, setSelectedGroup] = useState<string>("");
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [detailsCampaignId, setDetailsCampaignId] = useState<string | null>(null);
+
+  // Buscar campanhas do usuário
+  const fetchCampaigns = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("campaigns")
+        .select("*, messages_log(count)")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      const mapped = (data || []).map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        message: c.message,
+        status: c.status || "draft",
+        sent: c.messages_log?.[0]?.count || 0,
+        total: c.contact_ids?.length || 0,
+        scheduled_for: c.scheduled_for || null,
+      }));
+
+      setCampaigns(mapped);
+    } catch (error: any) {
+      toast({
+        title: "Erro ao buscar campanhas",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCampaigns();
+  }, [user]);
 
   const createCampaign = async (
     sendingMethod: "batch" | "queue",
@@ -73,7 +128,10 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         title: "Sucesso",
         description: "Campanha criada com sucesso! Clique em 'Iniciar' para começar o envio.",
       });
-      // Aqui você pode adicionar lógica para limpar o formulário ou atualizar a lista de campanhas
+      setNewCampaign({ name: "", message: "" });
+      setSelectedGroup("");
+      setMediaUrl(null);
+      fetchCampaigns();
     } catch (error: any) {
       toast({
         title: "Erro ao criar campanha",
@@ -83,11 +141,103 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
     }
   };
 
+  const deleteCampaign = async (id: string) => {
+    try {
+      const { error } = await supabase.from("campaigns").delete().eq("id", id);
+      if (error) throw error;
+      toast({ title: "Campanha excluída", description: "Campanha removida com sucesso." });
+      fetchCampaigns();
+    } catch (error: any) {
+      toast({ title: "Erro ao excluir campanha", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const startCampaign = async (id: string) => {
+    try {
+      const { data, error } = await supabase.rpc("start_campaign_processing", { campaign_id_param: id });
+      if (error) throw error;
+      if (data && typeof data === "string" && data.startsWith("Error")) {
+        toast({ title: "Erro", description: data, variant: "destructive" });
+      } else {
+        toast({ title: "Campanha iniciada", description: "Fila de mensagens criada e envio iniciado." });
+        fetchCampaigns();
+      }
+    } catch (error: any) {
+      toast({ title: "Erro ao iniciar campanha", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const pauseCampaign = async (id: string) => {
+    try {
+      const { error } = await supabase.from("campaigns").update({ status: "paused" }).eq("id", id);
+      if (error) throw error;
+      toast({ title: "Campanha pausada", description: "Envio da campanha pausado." });
+      fetchCampaigns();
+    } catch (error: any) {
+      toast({ title: "Erro ao pausar campanha", description: error.message, variant: "destructive" });
+    }
+  };
+
   return (
-    <div>
-      {/* Aqui você pode adicionar o formulário e a lista de campanhas */}
-      <h2 className="text-2xl font-bold mb-4">Gerenciar Campanhas</h2>
-      {/* Formulário e outros componentes */}
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold">Gerenciar Campanhas</h2>
+      <CampaignForm
+        newCampaign={newCampaign}
+        setNewCampaign={setNewCampaign}
+        mediaUrl={mediaUrl}
+        setMediaUrl={setMediaUrl}
+        contactSource="supabase"
+        setContactSource={() => {}}
+        googleConnected={false}
+        googleSheetName={null}
+        handleConnectGoogle={() => {}}
+        setGoogleConnected={() => {}}
+        setGoogleSheetName={() => {}}
+        supabaseGroups={contactGroups}
+        googleSheetGroups={[]}
+        selectedGroup={selectedGroup}
+        setSelectedGroup={setSelectedGroup}
+        createCampaign={createCampaign}
+        instances={[]} // Você pode integrar a lista de instâncias aqui se quiser
+        selectedInstanceId={selectedInstanceId}
+        setSelectedInstanceId={setSelectedInstanceId}
+      />
+      {loading ? (
+        <div className="text-center py-12 text-gray-500">Carregando campanhas...</div>
+      ) : (
+        <CampaignList
+          campaigns={campaigns}
+          deleteCampaign={deleteCampaign}
+          getStatusColor={(status) => {
+            switch (status) {
+              case "sending": return "bg-blue-100 text-blue-800";
+              case "scheduled": return "bg-yellow-100 text-yellow-800";
+              case "completed": return "bg-green-100 text-green-800";
+              case "paused": return "bg-orange-100 text-orange-800";
+              case "draft": return "bg-gray-100 text-gray-800";
+              default: return "bg-gray-100 text-gray-800";
+            }
+          }}
+          getStatusText={(status) => {
+            switch (status) {
+              case "sending": return "Enviando";
+              case "scheduled": return "Agendada";
+              case "completed": return "Concluída";
+              case "paused": return "Pausada";
+              case "draft": return "Rascunho";
+              default: return status;
+            }
+          }}
+          onStartCampaign={startCampaign}
+          onPauseCampaign={pauseCampaign}
+          onShowDetails={setDetailsCampaignId}
+        />
+      )}
+      <CampaignDetailsModal
+        campaignId={detailsCampaignId}
+        open={!!detailsCampaignId}
+        onOpenChange={(open) => !open && setDetailsCampaignId(null)}
+      />
     </div>
   );
 };
