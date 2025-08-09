@@ -30,6 +30,7 @@
 ## 🛠 Tecnologias e Plataforma
 
 - Desenvolvido em **Dyad.sh**
+- Reac + Supabase
 - Integração com **WhatsApp Business API**
 - Interface web moderna e responsiva
 
