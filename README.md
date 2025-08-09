@@ -1,73 +1,36 @@
-# Welcome to your Lovable project
+📱 WhatsPro — Automação Inteligente para WhatsApp
+O WhatsPro é uma plataforma completa de automação para WhatsApp, desenvolvida por Ramel Tecnologia, que leva a comunicação do seu negócio para o próximo nível.
 
-## Project info
+🔗 Acesse o sistema: whatspro.ramelseg.com.br
+👨‍💻 Desenvolvedor: Rafa Martins — ramelseg.com.br
 
-**URL**: https://lovable.dev/projects/0c8418c3-80c0-4602-8125-1529a7bbba63
+🚀 Funcionalidades Principais
+📤 Envio em massa com personalização
+Envie mensagens para centenas ou milhares de contatos de forma segmentada, utilizando variáveis para personalizar cada conversa.
 
-## How can I edit this code?
+📇 Gestão de contatos e grupos
+Organize e administre seus leads, clientes e grupos de forma simples e eficiente.
 
-There are several ways of editing your application.
+⏳ Agendamento e automação de campanhas
+Programe envios automáticos, crie fluxos de mensagens e otimize o tempo da sua equipe.
 
-**Use Lovable**
+🔄 Múltiplas instâncias de WhatsApp
+Conecte e gerencie diversos números ao mesmo tempo para diferentes setores ou campanhas.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/0c8418c3-80c0-4602-8125-1529a7bbba63) and start prompting.
+🛠 Tecnologias e Plataforma
+O sistema foi finalizado utilizando Dyad.sh, garantindo uma interface moderna, integração rápida e escalabilidade para atender empresas de qualquer porte.
 
-Changes made via Lovable will be committed automatically to this repo.
+📦 Como utilizar
+Acesse whatspro.ramelseg.com.br
 
-**Use your preferred IDE**
+Crie sua conta e conecte sua instância de WhatsApp
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+Importe ou cadastre seus contatos
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+Configure sua campanha, personalize a mensagem e agende o envio
 
-Follow these steps:
+Acompanhe os resultados em tempo real
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/0c8418c3-80c0-4602-8125-1529a7bbba63) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+📞 Contato e Suporte
+Desenvolvido por Rafa Martins
+Ramel Tecnologia — ramelseg.com.br
