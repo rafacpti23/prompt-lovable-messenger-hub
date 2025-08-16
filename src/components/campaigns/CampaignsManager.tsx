@@ -180,22 +180,37 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
 
       console.log("Campaign data:", campaign);
 
-      // Usar a função RPC correta
-      const { data, error } = await supabase.rpc("start_campaign_processing", { 
-        campaign_id_param: id 
-      });
-      
-      if (error) throw error;
-      if (data && typeof data === "string" && data.startsWith("Error")) {
-        toast.error("Erro", { description: data });
-      } else {
-        const methodName = campaign.sending_method === 'qstash' ? 'QStash' : 
-                          campaign.sending_method === 'queue' ? 'Fila Avançada' : 'Padrão';
-        toast.success("Campanha iniciada", { 
-          description: `Processamento iniciado via método ${methodName}.` 
+      // Usar a função RPC correta baseada no método de envio
+      if (campaign.sending_method === 'qstash') {
+        // Para QStash, usar função específica ou atualizar status diretamente
+        const { error: updateError } = await supabase
+          .from("campaigns")
+          .update({ status: 'scheduled' })
+          .eq("id", id);
+        
+        if (updateError) throw updateError;
+        
+        toast.success("Campanha QStash iniciada", { 
+          description: "Processamento iniciado via QStash." 
         });
-        fetchCampaigns();
+      } else {
+        // Para outros métodos, usar a função RPC existente
+        const { data, error } = await supabase.rpc("start_campaign_processing", { 
+          campaign_id_param: id 
+        });
+        
+        if (error) throw error;
+        if (data && typeof data === "string" && data.startsWith("Error")) {
+          toast.error("Erro", { description: data });
+        } else {
+          const methodName = campaign.sending_method === 'queue' ? 'Fila Avançada' : 'Padrão';
+          toast.success("Campanha iniciada", { 
+            description: `Processamento iniciado via método ${methodName}.` 
+          });
+        }
       }
+      
+      fetchCampaigns();
     } catch (error: any) {
       console.error("Error starting campaign:", error);
       toast.error("Erro ao iniciar campanha", { description: error.message });
@@ -216,9 +231,9 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Gerenciar Campanhas</h2>
+        <h2 className="text-2xl font-bold text-foreground">Gerenciar Campanhas</h2>
         <button
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
+          className="bg-primary text-primary-foreground px-4 py-2 rounded hover:bg-primary/90 transition"
           onClick={() => setShowCreateForm(true)}
         >
           Criar Nova Campanha
@@ -250,7 +265,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       ) : (
         <>
           {loading ? (
-            <div className="text-center py-12 text-gray-500">Carregando campanhas...</div>
+            <div className="text-center py-12 text-muted-foreground">Carregando campanhas...</div>
           ) : (
             <CampaignList
               campaigns={campaigns}

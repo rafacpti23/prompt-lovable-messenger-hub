@@ -18,7 +18,7 @@ export interface UserSubscription {
     price_per_message: number;
     duration_days: number;
     enable_queue_sending: boolean;
-    enable_qstash_sending: boolean; // Adicionado suporte ao QStash
+    enable_qstash_sending: boolean;
   };
 }
 
@@ -40,7 +40,17 @@ const fetchSubscription = async (userId: string): Promise<UserSubscription | nul
     throw new Error(error.message);
   }
   
-  return data as UserSubscription | null;
+  if (!data) return null;
+
+  // Garantir que as propriedades existam com valores padrão
+  return {
+    ...data,
+    plan: {
+      ...data.plan,
+      enable_queue_sending: data.plan?.enable_queue_sending ?? false,
+      enable_qstash_sending: data.plan?.enable_qstash_sending ?? false,
+    }
+  } as UserSubscription;
 }
 
 export function useUserSubscription() {

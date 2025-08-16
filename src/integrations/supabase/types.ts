@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -20,11 +20,15 @@ export type Database = {
           created_at: string
           id: string
           instance_id: string
+          interval_config: Json | null
+          media_url: string | null
           message: string
           name: string
           pause_between_messages: number | null
+          qstash_webhook_url: string | null
           scheduled_for: string | null
-          status: string | null
+          sending_method: string | null
+          status: Database["public"]["Enums"]["campaign_status"] | null
           updated_at: string
           user_id: string
         }
@@ -33,11 +37,15 @@ export type Database = {
           created_at?: string
           id?: string
           instance_id: string
+          interval_config?: Json | null
+          media_url?: string | null
           message: string
           name: string
           pause_between_messages?: number | null
+          qstash_webhook_url?: string | null
           scheduled_for?: string | null
-          status?: string | null
+          sending_method?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"] | null
           updated_at?: string
           user_id: string
         }
@@ -46,11 +54,15 @@ export type Database = {
           created_at?: string
           id?: string
           instance_id?: string
+          interval_config?: Json | null
+          media_url?: string | null
           message?: string
           name?: string
           pause_between_messages?: number | null
+          qstash_webhook_url?: string | null
           scheduled_for?: string | null
-          status?: string | null
+          sending_method?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"] | null
           updated_at?: string
           user_id?: string
         }
@@ -307,30 +319,6 @@ export type Database = {
         }
         Relationships: []
       }
-      localizacoes: {
-        Row: {
-          frete_id: string | null
-          id: string
-          latitude: number | null
-          longitude: number | null
-          timestamp: string | null
-        }
-        Insert: {
-          frete_id?: string | null
-          id?: string
-          latitude?: number | null
-          longitude?: number | null
-          timestamp?: string | null
-        }
-        Update: {
-          frete_id?: string | null
-          id?: string
-          latitude?: number | null
-          longitude?: number | null
-          timestamp?: string | null
-        }
-        Relationships: []
-      }
       media_repository: {
         Row: {
           created_at: string
@@ -387,6 +375,7 @@ export type Database = {
           scheduled_for: string | null
           sent_at: string
           status: string
+          user_id: string | null
         }
         Insert: {
           campaign_id?: string | null
@@ -398,6 +387,7 @@ export type Database = {
           scheduled_for?: string | null
           sent_at?: string
           status: string
+          user_id?: string | null
         }
         Update: {
           campaign_id?: string | null
@@ -409,6 +399,7 @@ export type Database = {
           scheduled_for?: string | null
           sent_at?: string
           status?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -427,35 +418,13 @@ export type Database = {
           },
         ]
       }
-      motoristas: {
-        Row: {
-          cpf: string
-          created_at: string | null
-          id: string
-          nome: string
-          telefone: string | null
-        }
-        Insert: {
-          cpf: string
-          created_at?: string | null
-          id?: string
-          nome: string
-          telefone?: string | null
-        }
-        Update: {
-          cpf?: string
-          created_at?: string | null
-          id?: string
-          nome?: string
-          telefone?: string | null
-        }
-        Relationships: []
-      }
       plans: {
         Row: {
           created_at: string
           credits: number
           duration_days: number
+          enable_qstash_sending: boolean
+          enable_queue_sending: boolean
           id: string
           is_active: boolean | null
           name: string
@@ -466,6 +435,8 @@ export type Database = {
           created_at?: string
           credits: number
           duration_days: number
+          enable_qstash_sending?: boolean
+          enable_queue_sending?: boolean
           id?: string
           is_active?: boolean | null
           name: string
@@ -476,6 +447,8 @@ export type Database = {
           created_at?: string
           credits?: number
           duration_days?: number
+          enable_qstash_sending?: boolean
+          enable_queue_sending?: boolean
           id?: string
           is_active?: boolean | null
           name?: string
@@ -492,6 +465,7 @@ export type Database = {
           id: string
           role: string | null
           updated_at: string
+          whatsapp: string | null
         }
         Insert: {
           created_at?: string
@@ -500,6 +474,7 @@ export type Database = {
           id: string
           role?: string | null
           updated_at?: string
+          whatsapp?: string | null
         }
         Update: {
           created_at?: string
@@ -508,6 +483,7 @@ export type Database = {
           id?: string
           role?: string | null
           updated_at?: string
+          whatsapp?: string | null
         }
         Relationships: []
       }
@@ -544,6 +520,7 @@ export type Database = {
           contact_id: string
           created_at: string
           id: string
+          media_url: string | null
           message: string
           phone: string
           scheduled_for: string
@@ -555,6 +532,7 @@ export type Database = {
           contact_id: string
           created_at?: string
           id?: string
+          media_url?: string | null
           message: string
           phone: string
           scheduled_for: string
@@ -566,6 +544,7 @@ export type Database = {
           contact_id?: string
           created_at?: string
           id?: string
+          media_url?: string | null
           message?: string
           phone?: string
           scheduled_for?: string
@@ -948,15 +927,7 @@ export type Database = {
           motorista_id?: string | null
           placa?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "veiculos_motorista_id_fkey"
-            columns: ["motorista_id"]
-            isOneToOne: false
-            referencedRelation: "motoristas"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Views: {
@@ -971,8 +942,48 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_pending_messages: {
+        Args: { limit_count: number }
+        Returns: {
+          campaign_id: string
+          contact_id: string
+          instance_name: string
+          media_url: string
+          message: string
+          message_id: string
+          phone: string
+          scheduled_for: string
+          user_id: string
+        }[]
+      }
+      lock_and_get_pending_message_ids: {
+        Args: { limit_count: number }
+        Returns: {
+          id: string
+        }[]
+      }
+      process_campaign_queue: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      queue_and_activate_campaign: {
+        Args: { campaign_id_param: string }
+        Returns: string
+      }
+      start_campaign_processing: {
+        Args: { campaign_id_param: string }
+        Returns: string
+      }
     }
     Enums: {
+      campaign_sending_method: "batch" | "queue"
+      campaign_status:
+        | "draft"
+        | "paused"
+        | "scheduled"
+        | "sending"
+        | "completed"
+        | "failed"
       delivery_status:
         | "scheduled"
         | "loading"
@@ -1114,6 +1125,15 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      campaign_sending_method: ["batch", "queue"],
+      campaign_status: [
+        "draft",
+        "paused",
+        "scheduled",
+        "sending",
+        "completed",
+        "failed",
+      ],
       delivery_status: [
         "scheduled",
         "loading",
