@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,12 +31,129 @@ interface Campaign {
     instance_name: string;
     status: string;
   };
+  sent?: number;
+  total?: number;
 }
 
 const CampaignsManager = () => {
   const { data: campaigns, isLoading, refetch } = useCampaigns();
   const [showForm, setShowForm] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+
+  // Estados para o formulário
+  const [newCampaign, setNewCampaign] = useState({ name: '', message: '' });
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+  const [contactSource, setContactSource] = useState('supabase');
+  const [googleConnected, setGoogleConnected] = useState(false);
+  const [googleSheetName, setGoogleSheetName] = useState<string | null>(null);
+  const [supabaseGroups, setSupabaseGroups] = useState<string[]>([]);
+  const [googleSheetGroups, setGoogleSheetGroups] = useState<string[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState('');
+  const [instances, setInstances] = useState<any[]>([]);
+  const [selectedInstanceId, setSelectedInstanceId] = useState('');
+
+  // Carregar dados necessários quando o formulário for aberto
+  React.useEffect(() => {
+    if (showForm) {
+      loadFormData();
+    }
+  }, [showForm]);
+
+  const loadFormData = async () => {
+    try {
+      // Carregar grupos de contatos
+      const { data: contactGroups } = await supabase
+        .from('contacts')
+        .select('grupo')
+        .not('grupo', 'is', null);
+      
+      const uniqueGroups = [...new Set(contactGroups?.map(c => c.grupo).filter(Boolean) || [])];
+      setSupabaseGroups(uniqueGroups);
+
+      // Carregar instâncias
+      const { data: instancesData } = await supabase
+        .from('instances')
+        .select('*')
+        .eq('status', 'connected');
+      
+      setInstances(instancesData || []);
+      if (instancesData && instancesData.length > 0) {
+        setSelectedInstanceId(instancesData[0].id);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados do formulário:', error);
+    }
+  };
+
+  const handleConnectGoogle = () => {
+    // Implementar conexão com Google se necessário
+    toast.info('Funcionalidade do Google Sheets em desenvolvimento');
+  };
+
+  const createCampaign = async (
+    sendingMethod: "batch" | "queue" | "qstash",
+    intervalConfig?: any[],
+    scheduledFor?: string,
+    qstashWebhookUrl?: string
+  ) => {
+    try {
+      if (!selectedGroup) {
+        toast.error('Selecione um grupo de contatos');
+        return;
+      }
+
+      if (!selectedInstanceId) {
+        toast.error('Selecione uma instância');
+        return;
+      }
+
+      // Buscar contatos do grupo selecionado
+      const { data: contacts } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('grupo', selectedGroup);
+
+      if (!contacts || contacts.length === 0) {
+        toast.error('Nenhum contato encontrado no grupo selecionado');
+        return;
+      }
+
+      const contactIds = contacts.map(c => c.id);
+
+      // Criar campanha
+      const { data: campaign, error } = await supabase
+        .from('campaigns')
+        .insert({
+          name: newCampaign.name,
+          message: newCampaign.message,
+          media_url: mediaUrl,
+          status: 'scheduled',
+          contact_ids: contactIds,
+          instance_id: selectedInstanceId,
+          sending_method: sendingMethod,
+          interval_config: intervalConfig,
+          scheduled_for: scheduledFor,
+          qstash_webhook_url: qstashWebhookUrl
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success('Campanha criada com sucesso!');
+      
+      // Resetar formulário
+      setNewCampaign({ name: '', message: '' });
+      setMediaUrl(null);
+      setSelectedGroup('');
+      setShowForm(false);
+      
+      refetch();
+    } catch (error) {
+      console.error('Erro ao criar campanha:', error);
+      toast.error('Erro ao criar campanha');
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -78,8 +196,7 @@ const CampaignsManager = () => {
         // Use QStash method
         const { data, error } = await supabase.functions.invoke('qstash-sender', {
           body: { 
-            campaignId: campaign.id,
-            action: 'start_campaign'
+            campaign_id: campaign.id
           }
         });
 
@@ -186,30 +303,27 @@ const CampaignsManager = () => {
       </div>
 
       {showForm && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Nova Campanha</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm text-muted-foreground mb-4">
-              Use o formulário de campanhas para criar uma nova campanha.
-            </div>
-            <div className="flex gap-3">
-              <Button 
-                onClick={handleFormSuccess}
-                className="bg-primary text-primary-foreground hover:bg-primary/90"
-              >
-                Nova Campanha
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setShowForm(false)}
-              >
-                Cancelar
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <CampaignForm
+          newCampaign={newCampaign}
+          setNewCampaign={setNewCampaign}
+          mediaUrl={mediaUrl}
+          setMediaUrl={setMediaUrl}
+          contactSource={contactSource}
+          setContactSource={setContactSource}
+          googleConnected={googleConnected}
+          googleSheetName={googleSheetName}
+          handleConnectGoogle={handleConnectGoogle}
+          setGoogleConnected={setGoogleConnected}
+          setGoogleSheetName={setGoogleSheetName}
+          supabaseGroups={supabaseGroups}
+          googleSheetGroups={googleSheetGroups}
+          selectedGroup={selectedGroup}
+          setSelectedGroup={setSelectedGroup}
+          createCampaign={createCampaign}
+          instances={instances}
+          selectedInstanceId={selectedInstanceId}
+          setSelectedInstanceId={setSelectedInstanceId}
+        />
       )}
 
       <div className="grid gap-4">
@@ -242,9 +356,6 @@ const CampaignsManager = () => {
                       <Clock className="h-4 w-4" />
                       {formatDistanceToNow(new Date(campaign.created_at), { addSuffix: true })}
                     </div>
-                    {campaign.instances?.instance_name && (
-                      <div>Instância: {campaign.instances.instance_name}</div>
-                    )}
                   </div>
                   
                   <p className="text-sm text-muted-foreground line-clamp-2">

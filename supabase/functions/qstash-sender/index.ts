@@ -32,14 +32,10 @@ serve(async (req) => {
 
     console.log("📋 Processando campanha:", campaign_id);
 
-    // Configurações do QStash
-    const QSTASH_URL = Deno.env.get('QSTASH_URL') || 'https://qstash.upstash.io';
-    const QSTASH_TOKEN = Deno.env.get('QSTASH_TOKEN') || 'eyJVc2VySUQiOiJlOWFjN2E3MC0zMDI5LTRlMDktYjVjZC03OWQyYTgyYmEwNDEiLCJQYXNzd29yZCI6IjIwNDVlZmJmMTYxMDRiMDFiMDJiNTY4NjhhNGYyYzU3In0=';
+    // Configurações do QStash com suas credenciais
+    const QSTASH_URL = 'https://qstash.upstash.io';
+    const QSTASH_TOKEN = 'eyJVc2VySUQiOiJlOWFjN2E3MC0zMDI5LTRlMDktYjVjZC03OWQyYTgyYmEwNDEiLCJQYXNzd29yZCI6IjIwNDVlZmJmMTYxMDRiMDFiMDJiNTY4NjhhNGYyYzU3In0=';
     
-    if (!QSTASH_TOKEN) {
-      throw new Error('QStash token não configurado');
-    }
-
     console.log("🔑 QStash URL:", QSTASH_URL);
 
     // Configurações da Evolution API  
@@ -91,8 +87,8 @@ serve(async (req) => {
     const intervals = campaign.interval_config || [{ quantity: 10, min: 5, max: 10 }];
     let totalProcessed = 0;
 
-    // Usar webhook URL da campanha ou uma padrão
-    const webhookUrl = campaign.qstash_webhook_url || `${Deno.env.get('SUPABASE_URL')}/functions/v1/qstash-webhook-handler`;
+    // Usar webhook URL da campanha ou o callback que você forneceu
+    const webhookUrl = campaign.qstash_webhook_url || 'https://n8n.ramelseg.com.br/webhook/flex';
     console.log("🔗 Webhook URL:", webhookUrl);
 
     for (let i = 0; i < contacts.length; i++) {
