@@ -35,7 +35,6 @@ interface Campaign {
 const CampaignsManager = () => {
   const { data: campaigns, isLoading, refetch } = useCampaigns();
   const [showForm, setShowForm] = useState(false);
-  const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
 
   const getStatusColor = (status: string) => {
@@ -160,7 +159,6 @@ const CampaignsManager = () => {
 
   const handleFormSuccess = () => {
     setShowForm(false);
-    setEditingCampaign(null);
     refetch();
   };
 
@@ -190,19 +188,26 @@ const CampaignsManager = () => {
       {showForm && (
         <Card>
           <CardHeader>
-            <CardTitle>
-              {editingCampaign ? 'Editar Campanha' : 'Nova Campanha'}
-            </CardTitle>
+            <CardTitle>Nova Campanha</CardTitle>
           </CardHeader>
           <CardContent>
-            <CampaignForm
-              campaign={editingCampaign}
-              onSuccess={handleFormSuccess}
-              onCancel={() => {
-                setShowForm(false);
-                setEditingCampaign(null);
-              }}
-            />
+            <div className="text-sm text-muted-foreground mb-4">
+              Use o formulário de campanhas para criar uma nova campanha.
+            </div>
+            <div className="flex gap-3">
+              <Button 
+                onClick={handleFormSuccess}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                Nova Campanha
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowForm(false)}
+              >
+                Cancelar
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
