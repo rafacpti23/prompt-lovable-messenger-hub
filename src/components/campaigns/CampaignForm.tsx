@@ -1,9 +1,10 @@
+
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Upload, X, Image as ImageIcon, Brain, Zap, Clock, Trash2 } from "lucide-react";
+import { Plus, Upload, X, Image as ImageIcon, Brain, Zap, Clock, Trash2, Settings } from "lucide-react";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import MediaRepository from "@/components/media/MediaRepository";
@@ -38,7 +39,7 @@ interface CampaignFormProps {
   googleSheetGroups: string[];
   selectedGroup: string;
   setSelectedGroup: (g: string) => void;
-  createCampaign: (sendingMethod: 'batch' | 'queue', intervalConfig?: Interval[], scheduledFor?: string) => void;
+  createCampaign: (sendingMethod: 'batch' | 'queue' | 'qstash', intervalConfig?: Interval[], scheduledFor?: string, qstashWebhookUrl?: string) => void;
   instances: Instance[];
   selectedInstanceId: string;
   setSelectedInstanceId: (id: string) => void;
@@ -62,11 +63,20 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
   const [messageType, setMessageType] = useState<"text" | "image" | "video">("text");
   const [showMediaRepository, setShowMediaRepository] = useState(false);
   const { subscription } = useUserSubscription();
-  const [sendingMethod, setSendingMethod] = useState<'batch' | 'queue'>('batch');
+  const [sendingMethod, setSendingMethod] = useState<'batch' | 'queue' | 'qstash'>('batch');
   const [intervals, setIntervals] = useState<Interval[]>([{ quantity: 10, min: 3, max: 8 }]);
   const [scheduledForLocal, setScheduledForLocal] = useState<string>("");
+  const [qstashWebhookUrl, setQstashWebhookUrl] = useState<string>(""); // Novo campo para webhook do QStash
 
+  // Verificar permissões baseadas no plano
   const canUseQueueSending = subscription?.plan?.enable_queue_sending ?? false;
+  const canUseQStashSending = subscription?.plan?.enable_qstash_sending ?? false;
+
+  console.log("CampaignForm - Plan permissions:", { 
+    canUseQueueSending, 
+    canUseQStashSending, 
+    plan: subscription?.plan 
+  });
 
   const handleIntervalChange = (index: number, field: keyof Interval, value: string) => {
     const newIntervals = [...intervals];
@@ -115,18 +125,31 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
 
   const isFormValid = () => {
     const hasScheduledFor = scheduledForLocal && new Date(scheduledForLocal) > new Date();
+    const hasWebhookForQStash = sendingMethod !== 'qstash' || qstashWebhookUrl.trim() !== '';
+    
     return (
       selectedInstanceId &&
       newCampaign.name.trim() &&
       selectedGroup &&
       hasScheduledFor &&
+      hasWebhookForQStash &&
       (newCampaign.message.trim() || mediaUrl)
     );
   };
 
   const handleCreateCampaign = () => {
     const scheduledForUTC = scheduledForLocal ? new Date(scheduledForLocal).toISOString() : undefined;
-    createCampaign(sendingMethod, sendingMethod === 'queue' ? intervals : undefined, scheduledForUTC);
+    const intervalConfig = (sendingMethod === 'queue' || sendingMethod === 'qstash') ? intervals : undefined;
+    const webhookUrl = sendingMethod === 'qstash' ? qstashWebhookUrl : undefined;
+    
+    console.log("Creating campaign with:", { 
+      sendingMethod, 
+      intervalConfig, 
+      scheduledForUTC, 
+      webhookUrl 
+    });
+    
+    createCampaign(sendingMethod, intervalConfig, scheduledForUTC, webhookUrl);
   };
 
   return (
@@ -138,54 +161,57 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* ... (código existente para Instância, Fonte de Contatos, Grupo) ... */}
+        {/* Instância WhatsApp */}
         <div>
-            <label className="block font-medium mb-2">Instância WhatsApp *</label>
-            <Select value={selectedInstanceId} onValueChange={setSelectedInstanceId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione uma instância" />
-              </SelectTrigger>
-              <SelectContent>
-                {instances.map((instance) => (
-                  <SelectItem key={instance.id} value={instance.id}>
-                    {instance.instance_name} ({instance.status || 'Desconectado'})
+          <label className="block font-medium mb-2">Instância WhatsApp *</label>
+          <Select value={selectedInstanceId} onValueChange={setSelectedInstanceId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione uma instância" />
+            </SelectTrigger>
+            <SelectContent>
+              {instances.map((instance) => (
+                <SelectItem key={instance.id} value={instance.id}>
+                  {instance.instance_name} ({instance.status || 'Desconectado'})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Fonte de Contatos */}
+        <div>
+          <label className="block font-medium mb-2">Fonte de Contatos *</label>
+          <Select value={contactSource} onValueChange={(value) => setContactSource(value as "supabase" | "google")}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione a fonte" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="supabase">Contatos do Sistema</SelectItem>
+              <SelectItem value="google" disabled>Planilha Google (em breve)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Grupo de Contatos */}
+        <div>
+          <label className="block font-medium mb-2">Grupo de Contatos *</label>
+          <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione um grupo" />
+            </SelectTrigger>
+            <SelectContent>
+              {supabaseGroups
+                .filter(group => group && group.trim() !== "")
+                .map((group) => (
+                  <SelectItem key={group} value={group}>
+                    {group}
                   </SelectItem>
                 ))}
-              </SelectContent>
-            </Select>
-          </div>
+            </SelectContent>
+          </Select>
+        </div>
 
-          <div>
-            <label className="block font-medium mb-2">Fonte de Contatos *</label>
-            <Select value={contactSource} onValueChange={(value) => setContactSource(value as "supabase" | "google")}>
-                <SelectTrigger>
-                    <SelectValue placeholder="Selecione a fonte" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="supabase">Contatos do Sistema</SelectItem>
-                    <SelectItem value="google" disabled>Planilha Google (em breve)</SelectItem>
-                </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <label className="block font-medium mb-2">Grupo de Contatos *</label>
-            <Select value={selectedGroup} onValueChange={setSelectedGroup}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione um grupo" />
-              </SelectTrigger>
-              <SelectContent>
-                {supabaseGroups
-                  .filter(group => group && group.trim() !== "")
-                  .map((group) => (
-                    <SelectItem key={group} value={group}>
-                      {group}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </div>
-
+        {/* Data e Hora de Agendamento */}
         <div>
           <label className="block font-medium mb-2">Data e Hora de Agendamento *</label>
           <Input
@@ -196,6 +222,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
           />
         </div>
 
+        {/* Nome da Campanha */}
         <div>
           <label className="block font-medium mb-2">Nome da Campanha *</label>
           <Input
@@ -205,6 +232,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
           />
         </div>
 
+        {/* Mensagem da Campanha */}
         <div>
           <label className="block font-medium mb-2">Mensagem da Campanha</label>
           <div className="relative">
@@ -228,6 +256,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
           </div>
         </div>
 
+        {/* Arquivo de Mídia */}
         <div>
           <label className="block font-medium mb-2">Arquivo de Mídia (Opcional)</label>
           {mediaUrl ? (
@@ -246,73 +275,125 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
           )}
         </div>
 
-        {canUseQueueSending && (
-          <div>
-            <label className="block font-medium mb-2">Método de Envio *</label>
-            <Select value={sendingMethod} onValueChange={(value) => setSendingMethod(value as 'batch' | 'queue')}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o método de envio" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="batch">Padrão (Intervalo Fixo)</SelectItem>
-                <SelectItem value="queue">Avançado (Intervalos Aleatórios)</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            {sendingMethod === 'queue' && (
-              <div className="mt-4 p-4 border rounded-lg bg-muted/50 space-y-3">
-                <h4 className="font-semibold text-sm">Configurar Blocos de Envio</h4>
-                {intervals.map((interval, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      placeholder="Qtd"
-                      value={interval.quantity}
-                      onChange={(e) => handleIntervalChange(index, 'quantity', e.target.value)}
-                      className="w-20"
-                    />
-                    <span className="text-sm">msgs a cada</span>
-                    <Input
-                      type="number"
-                      placeholder="Min"
-                      value={interval.min}
-                      onChange={(e) => handleIntervalChange(index, 'min', e.target.value)}
-                      className="w-20"
-                    />
-                    <span className="text-sm">a</span>
-                    <Input
-                      type="number"
-                      placeholder="Max"
-                      value={interval.max}
-                      onChange={(e) => handleIntervalChange(index, 'max', e.target.value)}
-                      className="w-20"
-                    />
-                    <span className="text-sm">seg</span>
-                    {intervals.length > 1 && (
-                      <Button variant="ghost" size="icon" onClick={() => removeInterval(index)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    )}
+        {/* Método de Envio */}
+        <div>
+          <label className="block font-medium mb-2">Método de Envio *</label>
+          <Select value={sendingMethod} onValueChange={(value) => setSendingMethod(value as 'batch' | 'queue' | 'qstash')}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione o método de envio" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="batch">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Padrão (Intervalo Fixo)
+                </div>
+              </SelectItem>
+              {canUseQueueSending && (
+                <SelectItem value="queue">
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-4 w-4" />
+                    Avançado (Intervalos Aleatórios)
                   </div>
-                ))}
-                {intervals.length < 5 && (
-                  <Button variant="outline" size="sm" onClick={addInterval}>
-                    <Plus className="h-4 w-4 mr-2" /> Adicionar Bloco
-                  </Button>
-                )}
+                </SelectItem>
+              )}
+              {canUseQStashSending && (
+                <SelectItem value="qstash">
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    QStash Premium (Máxima Confiabilidade)
+                  </div>
+                </SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+          
+          {/* Configurações específicas para QStash */}
+          {sendingMethod === 'qstash' && (
+            <div className="mt-4 p-4 border rounded-lg bg-blue-50 space-y-3">
+              <h4 className="font-semibold text-sm flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                Configurações QStash
+              </h4>
+              <div>
+                <Label htmlFor="qstash-webhook">URL do Webhook (Callback) *</Label>
+                <Input
+                  id="qstash-webhook"
+                  placeholder="https://seu-webhook.n8n.com/webhook/..."
+                  value={qstashWebhookUrl}
+                  onChange={(e) => setQstashWebhookUrl(e.target.value)}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  URL que será chamada quando as mensagens forem processadas (ex: webhook do n8n)
+                </p>
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+          
+          {/* Configuração de Intervalos para Queue e QStash */}
+          {(sendingMethod === 'queue' || sendingMethod === 'qstash') && (
+            <div className="mt-4 p-4 border rounded-lg bg-muted/50 space-y-3">
+              <h4 className="font-semibold text-sm">
+                Configurar Blocos de Envio {sendingMethod === 'qstash' && '(QStash)'}
+              </h4>
+              {intervals.map((interval, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    placeholder="Qtd"
+                    value={interval.quantity}
+                    onChange={(e) => handleIntervalChange(index, 'quantity', e.target.value)}
+                    className="w-20"
+                  />
+                  <span className="text-sm">msgs a cada</span>
+                  <Input
+                    type="number"
+                    placeholder="Min"
+                    value={interval.min}
+                    onChange={(e) => handleIntervalChange(index, 'min', e.target.value)}
+                    className="w-20"
+                  />
+                  <span className="text-sm">a</span>
+                  <Input
+                    type="number"
+                    placeholder="Max"
+                    value={interval.max}
+                    onChange={(e) => handleIntervalChange(index, 'max', e.target.value)}
+                    className="w-20"
+                  />
+                  <span className="text-sm">seg</span>
+                  {intervals.length > 1 && (
+                    <Button variant="ghost" size="icon" onClick={() => removeInterval(index)}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              {intervals.length < 5 && (
+                <Button variant="outline" size="sm" onClick={addInterval}>
+                  <Plus className="h-4 w-4 mr-2" /> Adicionar Bloco
+                </Button>
+              )}
+              {sendingMethod === 'qstash' && (
+                <p className="text-xs text-blue-600 bg-blue-100 p-2 rounded">
+                  📋 As mensagens serão enviadas via QStash com alta confiabilidade e retry automático
+                </p>
+              )}
+            </div>
+          )}
+        </div>
 
         <Button onClick={handleCreateCampaign} disabled={!isFormValid()}>
           <Plus className="h-4 w-4 mr-2" />
           Criar e Agendar Campanha
         </Button>
         {!isFormValid() && (
-          <p className="text-xs text-red-500 mt-2">
-            * Preencha todos os campos obrigatórios para criar a campanha.
-          </p>
+          <div className="text-xs text-red-500 mt-2 space-y-1">
+            <p>* Preencha todos os campos obrigatórios para criar a campanha:</p>
+            {sendingMethod === 'qstash' && !qstashWebhookUrl.trim() && (
+              <p>- URL do webhook é obrigatória para envio via QStash</p>
+            )}
+          </div>
         )}
       </CardContent>
 

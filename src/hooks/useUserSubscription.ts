@@ -1,3 +1,4 @@
+
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -16,7 +17,8 @@ export interface UserSubscription {
     credits: number;
     price_per_message: number;
     duration_days: number;
-    enable_queue_sending: boolean; // Adicionado
+    enable_queue_sending: boolean;
+    enable_qstash_sending: boolean; // Adicionado suporte ao QStash
   };
 }
 

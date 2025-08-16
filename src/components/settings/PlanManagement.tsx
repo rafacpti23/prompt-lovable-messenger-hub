@@ -16,6 +16,7 @@ interface Plan {
   duration_days: number;
   is_active: boolean;
   enable_queue_sending: boolean;
+  enable_qstash_sending: boolean;
   created_at: string;
 }
 
@@ -23,13 +24,13 @@ const PlanManagement: React.FC = () => {
   const { toast } = useToast();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [newPlan, setNewPlan] = useState({
     name: "",
     price: 0,
     credits: 0,
     duration_days: 30,
     enable_queue_sending: false,
+    enable_qstash_sending: false,
   });
 
   useEffect(() => {
@@ -44,7 +45,14 @@ const PlanManagement: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPlans(data || []);
+      
+      const plansWithDefaults = (data || []).map(plan => ({
+        ...plan,
+        enable_queue_sending: plan.enable_queue_sending ?? false,
+        enable_qstash_sending: plan.enable_qstash_sending ?? false,
+      }));
+      
+      setPlans(plansWithDefaults);
     } catch (error: any) {
       toast({
         title: "Erro ao buscar planos",
@@ -76,14 +84,28 @@ const PlanManagement: React.FC = () => {
           duration_days: newPlan.duration_days,
           price_per_message: newPlan.price / newPlan.credits,
           enable_queue_sending: newPlan.enable_queue_sending,
+          enable_qstash_sending: newPlan.enable_qstash_sending,
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      setPlans([data, ...plans]);
-      setNewPlan({ name: "", price: 0, credits: 0, duration_days: 30, enable_queue_sending: false });
+      const planWithDefaults = {
+        ...data,
+        enable_queue_sending: data.enable_queue_sending ?? false,
+        enable_qstash_sending: data.enable_qstash_sending ?? false,
+      };
+
+      setPlans([planWithDefaults, ...plans]);
+      setNewPlan({ 
+        name: "", 
+        price: 0, 
+        credits: 0, 
+        duration_days: 30, 
+        enable_queue_sending: false,
+        enable_qstash_sending: false,
+      });
       
       toast({
         title: "Sucesso",
@@ -92,32 +114,6 @@ const PlanManagement: React.FC = () => {
     } catch (error: any) {
       toast({
         title: "Erro ao criar plano",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const togglePlanStatus = async (planId: string, isActive: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('plans')
-        .update({ is_active: !isActive })
-        .eq('id', planId);
-
-      if (error) throw error;
-
-      setPlans(plans.map(plan => 
-        plan.id === planId ? { ...plan, is_active: !isActive } : plan
-      ));
-
-      toast({
-        title: "Sucesso",
-        description: `Plano ${!isActive ? 'ativado' : 'desativado'} com sucesso!`,
-      });
-    } catch (error: any) {
-      toast({
-        title: "Erro ao atualizar plano",
         description: error.message,
         variant: "destructive",
       });
@@ -140,6 +136,58 @@ const PlanManagement: React.FC = () => {
       toast({
         title: "Sucesso",
         description: `Envio por fila ${enabled ? 'habilitado' : 'desabilitado'} para o plano.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar plano",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const toggleQStashSending = async (planId: string, enabled: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('plans')
+        .update({ enable_qstash_sending: enabled })
+        .eq('id', planId);
+
+      if (error) throw error;
+
+      setPlans(plans.map(plan => 
+        plan.id === planId ? { ...plan, enable_qstash_sending: enabled } : plan
+      ));
+
+      toast({
+        title: "Sucesso",
+        description: `Envio via QStash ${enabled ? 'habilitado' : 'desabilitado'} para o plano.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar plano",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const togglePlanStatus = async (planId: string, isActive: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('plans')
+        .update({ is_active: !isActive })
+        .eq('id', planId);
+
+      if (error) throw error;
+
+      setPlans(plans.map(plan => 
+        plan.id === planId ? { ...plan, is_active: !isActive } : plan
+      ));
+
+      toast({
+        title: "Sucesso",
+        description: `Plano ${!isActive ? 'ativado' : 'desativado'} com sucesso!`,
       });
     } catch (error: any) {
       toast({
@@ -221,16 +269,30 @@ const PlanManagement: React.FC = () => {
               />
             </div>
 
-            <div className="col-span-2 flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="enable-queue-sending"
-                checked={newPlan.enable_queue_sending}
-                onChange={(e) => setNewPlan({ ...newPlan, enable_queue_sending: e.target.checked })}
-              />
-              <Label htmlFor="enable-queue-sending" className="mb-0 cursor-pointer">
-                Habilitar envio por fila avançada (intervalos aleatórios)
-              </Label>
+            <div className="col-span-2 space-y-2">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="enable-queue-sending"
+                  checked={newPlan.enable_queue_sending}
+                  onChange={(e) => setNewPlan({ ...newPlan, enable_queue_sending: e.target.checked })}
+                />
+                <Label htmlFor="enable-queue-sending" className="mb-0 cursor-pointer">
+                  Habilitar envio por fila avançada (intervalos aleatórios)
+                </Label>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="enable-qstash-sending"
+                  checked={newPlan.enable_qstash_sending}
+                  onChange={(e) => setNewPlan({ ...newPlan, enable_qstash_sending: e.target.checked })}
+                />
+                <Label htmlFor="enable-qstash-sending" className="mb-0 cursor-pointer">
+                  Habilitar envio via QStash (método premium com intervalos aleatórios)
+                </Label>
+              </div>
             </div>
           </div>
           
@@ -259,12 +321,13 @@ const PlanManagement: React.FC = () => {
                 <div className="text-xs text-gray-400">
                   R$ {(plan.price / plan.credits).toFixed(4)} por mensagem
                 </div>
-                <div className="text-xs text-gray-400 mt-1">
-                  Envio por fila avançada: {plan.enable_queue_sending ? "Sim" : "Não"}
+                <div className="text-xs text-gray-400 mt-1 space-y-1">
+                  <div>Envio por fila avançada: {plan.enable_queue_sending ? "Sim" : "Não"}</div>
+                  <div>Envio via QStash: {plan.enable_qstash_sending ? "Sim" : "Não"}</div>
                 </div>
               </div>
               
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   variant="outline"
                   size="sm"
@@ -279,6 +342,14 @@ const PlanManagement: React.FC = () => {
                 >
                   {plan.enable_queue_sending ? <Check className="mr-1" /> : null}
                   {plan.enable_queue_sending ? "Fila Ativa" : "Fila Inativa"}
+                </Button>
+                <Button
+                  variant={plan.enable_qstash_sending ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => toggleQStashSending(plan.id, !plan.enable_qstash_sending)}
+                >
+                  {plan.enable_qstash_sending ? <Check className="mr-1" /> : null}
+                  {plan.enable_qstash_sending ? "QStash Ativo" : "QStash Inativo"}
                 </Button>
               </div>
             </div>

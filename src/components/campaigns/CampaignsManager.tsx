@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { toast } from "sonner"; // Keep this import for sonner
+import { toast } from "sonner";
 import CampaignList from "./CampaignList";
 import CampaignForm from "./CampaignForm";
 import CampaignDetailsModal from "./CampaignDetailsModal";
@@ -71,9 +72,10 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
   }, [user]);
 
   const createCampaign = async (
-    sendingMethod: "batch" | "queue",
+    sendingMethod: "batch" | "queue" | "qstash",
     intervalConfig?: any[],
-    scheduledFor?: string
+    scheduledFor?: string,
+    qstashWebhookUrl?: string
   ) => {
     if (!user || !newCampaign.name || !selectedInstanceId || !selectedGroup) {
       toast.error("Erro", {
@@ -88,6 +90,16 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       });
       return;
     }
+
+    // Validação específica para QStash
+    if (sendingMethod === 'qstash' && (!qstashWebhookUrl || !qstashWebhookUrl.trim())) {
+      toast.error("Erro", {
+        description: "URL do webhook é obrigatória para envio via QStash.",
+      });
+      return;
+    }
+
+    console.log("Creating campaign with method:", sendingMethod, { intervalConfig, scheduledFor, qstashWebhookUrl });
 
     try {
       const { data: contacts, error: contactsError } = await supabase
@@ -105,7 +117,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       }
       const contactIds = contacts.map((c) => c.id);
 
-      const { error } = await supabase.from("campaigns").insert({
+      const campaignData: any = {
         user_id: user.id,
         instance_id: selectedInstanceId,
         name: newCampaign.name,
@@ -116,11 +128,18 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         sending_method: sendingMethod,
         interval_config: intervalConfig,
         scheduled_for: scheduledFor,
-      });
+      };
+
+      // Adicionar webhook URL se for método QStash
+      if (sendingMethod === 'qstash' && qstashWebhookUrl) {
+        campaignData.qstash_webhook_url = qstashWebhookUrl;
+      }
+
+      const { error } = await supabase.from("campaigns").insert(campaignData);
       if (error) throw error;
 
       toast.success("Sucesso", {
-        description: "Campanha criada com sucesso! Clique em 'Iniciar' para começar o envio.",
+        description: `Campanha criada com método ${sendingMethod.toUpperCase()}! Clique em 'Iniciar' para começar o envio.`,
       });
       setNewCampaign({ name: "", message: "" });
       setSelectedGroup("");
@@ -128,6 +147,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       setShowCreateForm(false);
       fetchCampaigns();
     } catch (error: any) {
+      console.error("Error creating campaign:", error);
       toast.error("Erro ao criar campanha", {
         description: error.message,
       });
@@ -147,15 +167,37 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
 
   const startCampaign = async (id: string) => {
     try {
-      const { data, error } = await supabase.rpc("start_campaign_processing", { campaign_id_param: id });
+      console.log("Starting campaign:", id);
+      
+      // Buscar dados da campanha primeiro para determinar o método
+      const { data: campaign, error: campaignError } = await supabase
+        .from("campaigns")
+        .select("sending_method, qstash_webhook_url")
+        .eq("id", id)
+        .single();
+
+      if (campaignError) throw campaignError;
+
+      console.log("Campaign data:", campaign);
+
+      // Usar a função RPC correta
+      const { data, error } = await supabase.rpc("start_campaign_processing", { 
+        campaign_id_param: id 
+      });
+      
       if (error) throw error;
       if (data && typeof data === "string" && data.startsWith("Error")) {
         toast.error("Erro", { description: data });
       } else {
-        toast.success("Campanha iniciada", { description: "Fila de mensagens criada e envio iniciado." });
+        const methodName = campaign.sending_method === 'qstash' ? 'QStash' : 
+                          campaign.sending_method === 'queue' ? 'Fila Avançada' : 'Padrão';
+        toast.success("Campanha iniciada", { 
+          description: `Processamento iniciado via método ${methodName}.` 
+        });
         fetchCampaigns();
       }
     } catch (error: any) {
+      console.error("Error starting campaign:", error);
       toast.error("Erro ao iniciar campanha", { description: error.message });
     }
   };
