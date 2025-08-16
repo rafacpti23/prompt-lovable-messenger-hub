@@ -172,7 +172,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
       // Buscar dados da campanha primeiro para determinar o método
       const { data: campaign, error: campaignError } = await supabase
         .from("campaigns")
-        .select("sending_method, qstash_webhook_url")
+        .select("*")
         .eq("id", id)
         .single();
 
@@ -180,21 +180,52 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
 
       console.log("Campaign data:", campaign);
 
-      // Usar a função RPC correta baseada no método de envio
       if (campaign.sending_method === 'qstash') {
-        // Para QStash, usar função específica ou atualizar status diretamente
-        const { error: updateError } = await supabase
+        console.log("Iniciando campanha QStash...");
+        
+        // Para QStash, chamar a edge function qstash-sender
+        const { data, error } = await supabase.functions.invoke('qstash-sender', {
+          body: { campaign_id: id }
+        });
+        
+        if (error) {
+          console.error("Erro ao invocar qstash-sender:", error);
+          throw new Error(`Erro no QStash: ${error.message}`);
+        }
+        
+        console.log("Resposta do QStash sender:", data);
+        toast.success("Campanha QStash iniciada", { 
+          description: "Mensagens enviadas para processamento via QStash." 
+        });
+        
+      } else if (campaign.sending_method === 'queue') {
+        console.log("Iniciando campanha Fila Avançada...");
+        
+        // Para método queue, inserir mensagens na fila pgmq
+        const { data, error } = await supabase.rpc('enqueue_campaign_messages', { 
+          campaign_id_param: id 
+        });
+        
+        if (error) {
+          console.error("Erro ao enfileirar mensagens:", error);
+          throw new Error(`Erro na fila: ${error.message}`);
+        }
+        
+        // Atualizar status da campanha
+        await supabase
           .from("campaigns")
-          .update({ status: 'scheduled' })
+          .update({ status: 'sending' })
           .eq("id", id);
         
-        if (updateError) throw updateError;
-        
-        toast.success("Campanha QStash iniciada", { 
-          description: "Processamento iniciado via QStash." 
+        console.log("Mensagens enfileiradas:", data);
+        toast.success("Campanha da Fila Avançada iniciada", { 
+          description: "Mensagens adicionadas à fila para processamento." 
         });
+        
       } else {
-        // Para outros métodos, usar a função RPC existente
+        console.log("Iniciando campanha método padrão...");
+        
+        // Para método batch, usar a função RPC existente
         const { data, error } = await supabase.rpc("start_campaign_processing", { 
           campaign_id_param: id 
         });
@@ -203,9 +234,8 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
         if (data && typeof data === "string" && data.startsWith("Error")) {
           toast.error("Erro", { description: data });
         } else {
-          const methodName = campaign.sending_method === 'queue' ? 'Fila Avançada' : 'Padrão';
           toast.success("Campanha iniciada", { 
-            description: `Processamento iniciado via método ${methodName}.` 
+            description: "Processamento iniciado via método Padrão." 
           });
         }
       }
