@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -142,4 +143,5 @@ const CampaignDetailsModal: React.FC<CampaignDetailsModalProps> = ({ campaignId,
   );
 };
 
+export { CampaignDetailsModal };
 export default CampaignDetailsModal;

@@ -1,12 +1,11 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Play, Pause, RotateCcw, Trash2, Eye, Users, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useCampaigns } from '@/hooks/useCampaigns';
-import { CampaignForm } from './CampaignForm';
-import { CampaignDetailsModal } from './CampaignDetailsModal';
+import CampaignForm from './CampaignForm';
+import CampaignDetailsModal from './CampaignDetailsModal';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -33,8 +32,8 @@ interface Campaign {
   };
 }
 
-export const CampaignsManager = () => {
-  const { campaigns, isLoading, refetch } = useCampaigns();
+const CampaignsManager = () => {
+  const { data: campaigns, isLoading, refetch } = useCampaigns();
   const [showForm, setShowForm] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
@@ -209,7 +208,7 @@ export const CampaignsManager = () => {
       )}
 
       <div className="grid gap-4">
-        {campaigns?.map((campaign: Campaign) => (
+        {campaigns?.map((campaign: any) => (
           <Card key={campaign.id} className="hover:shadow-md transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -232,7 +231,7 @@ export const CampaignsManager = () => {
                   <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
                     <div className="flex items-center gap-1">
                       <Users className="h-4 w-4" />
-                      {campaign.contact_ids?.length || 0} contatos
+                      {campaign.total || 0} contatos
                     </div>
                     <div className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
@@ -314,7 +313,7 @@ export const CampaignsManager = () => {
 
       {selectedCampaign && (
         <CampaignDetailsModal
-          campaign={selectedCampaign}
+          campaignId={selectedCampaign.id}
           open={!!selectedCampaign}
           onOpenChange={(open) => !open && setSelectedCampaign(null)}
         />
@@ -322,3 +321,5 @@ export const CampaignsManager = () => {
     </div>
   );
 };
+
+export default CampaignsManager;

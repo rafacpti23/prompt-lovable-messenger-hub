@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
@@ -67,7 +68,7 @@ const MainLayout = ({ user, profile, signOut, theme, setTheme }: MainLayoutProps
       case 'dashboard': return <Dashboard />;
       case 'instances': return <InstancesManager />;
       case 'contacts': return <ContactsManager contacts={contacts} setContacts={setContacts} groups={groups} loading={loadingContacts} user={user} />;
-      case 'campaigns': return <CampaignsManager contactGroups={groups} />;
+      case 'campaigns': return <CampaignsManager />;
       case 'media': return <MediaRepository />;
       case 'billing': return <BillingManager />;
       default: return <Dashboard />;
