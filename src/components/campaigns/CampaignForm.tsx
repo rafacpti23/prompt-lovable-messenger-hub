@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,25 +88,20 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
 
   useEffect(() => {
     if (contactSource === "google" && !googleConnected) {
-      toast({
-        title: "Atenção",
-        description: "Conecte-se ao Google para selecionar um grupo.",
+      toast("Conecte-se ao Google para selecionar um grupo.", {
+        description: "Atenção"
       });
     }
   }, [contactSource, googleConnected]);
 
   const handleSubmit = () => {
     if (!scheduledDateTime) {
-      toast.error("Erro", {
-        description: "Data e hora de agendamento são obrigatórias.",
-      });
+      toast.error("Data e hora de agendamento são obrigatórias.");
       return;
     }
 
     if (sendingMethod === 'qstash' && (!qstashWebhookUrl || !qstashWebhookUrl.trim())) {
-      toast.error("Erro", {
-        description: "URL do webhook é obrigatória para envio via QStash.",
-      });
+      toast.error("URL do webhook é obrigatória para envio via QStash.");
       return;
     }
 
@@ -393,7 +389,8 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
         {/* Preview da Mensagem */}
         <MessagePreview 
           message={newCampaign.message}
-          mediaUrl={mediaUrl}
+          messageType="text"
+          mediaPreview={mediaUrl}
         />
 
         {/* Mídia */}

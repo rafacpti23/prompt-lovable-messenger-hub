@@ -13,6 +13,14 @@ const fetchDashboardStats = async (userId: string) => {
 
   if (campaignsError) throw campaignsError;
 
+  // Buscar total de campanhas
+  const { count: totalCampaignsCount, error: totalCampaignsError } = await supabase
+    .from("campaigns")
+    .select("*", { count: 'exact', head: true })
+    .eq("user_id", userId);
+
+  if (totalCampaignsError) throw totalCampaignsError;
+
   // Buscar total de contatos
   const { count: contactsCount, error: contactsError } = await supabase
     .from("contacts")
@@ -33,10 +41,30 @@ const fetchDashboardStats = async (userId: string) => {
 
   if (messagesError) throw messagesError;
 
+  // Buscar total de mensagens enviadas
+  const { count: sentMessagesCount, error: sentMessagesError } = await supabase
+    .from("messages_log")
+    .select("*", { count: 'exact', head: true })
+    .eq("user_id", userId)
+    .eq("status", "sent");
+
+  if (sentMessagesError) throw sentMessagesError;
+
+  // Buscar total de instâncias
+  const { count: instancesCount, error: instancesError } = await supabase
+    .from("instances")
+    .select("*", { count: 'exact', head: true })
+    .eq("user_id", userId);
+
+  if (instancesError) throw instancesError;
+
   return {
     activeCampaigns: campaigns?.length || 0,
+    totalCampaigns: totalCampaignsCount || 0,
     totalContacts: contactsCount || 0,
     messagesSentToday: todayMessages || 0,
+    sentMessages: sentMessagesCount || 0,
+    totalInstances: instancesCount || 0,
   };
 };
 
