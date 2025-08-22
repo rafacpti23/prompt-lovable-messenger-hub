@@ -43,8 +43,8 @@ const Dashboard = () => {
     });
 
     try {
-      // Invoca a função queue-worker para processar mensagens da fila avançada
-      const { data, error } = await supabase.functions.invoke('queue-worker');
+      // Invoca a função message-sender para processar mensagens da fila avançada
+      const { data, error } = await supabase.functions.invoke('message-sender');
 
       if (error) throw new Error(error.message);
       if (data.error) throw new Error(data.error);
