@@ -36,23 +36,23 @@ serve(async (req) => {
 
     // Loop contínuo enquanto houver mensagens e tempo
     while (totalProcessed < MAX_MESSAGES_PER_RUN && (Date.now() - startTime) < MAX_PROCESSING_TIME) {
-      // 1. Ler mensagens da fila pgmq
-      console.log("Lendo mensagens da fila...");
-      const { data: messages, error: readError } = await supabaseClient.rpc('read_from_message_queue', {
-        p_count: 10 // Pega 10 mensagens de cada vez
+      // 1. Ler mensagens pendentes usando get_pending_messages
+      console.log("Lendo mensagens pendentes com get_pending_messages...");
+      const { data: messages, error: readError } = await supabaseClient.rpc('get_pending_messages', {
+        limit_count: 10 // Pega 10 mensagens de cada vez
       });
 
       if (readError) {
-        console.error("Erro ao ler da fila:", readError);
-        throw new Error(`Failed to read from message queue: ${readError.message}`);
+        console.error("Erro ao ler mensagens pendentes:", readError);
+        throw new Error(`Failed to read pending messages: ${readError.message}`);
       }
 
       if (!messages || messages.length === 0) {
-        console.log("Nenhuma mensagem na fila para processar. Encerrando.");
+        console.log("Nenhuma mensagem pendente para processar. Encerrando.");
         break; // Sai do loop se não houver mais mensagens
       }
 
-      console.log(`Processando ${messages.length} mensagens da fila...`);
+      console.log(`Processando ${messages.length} mensagens pendentes...`);
 
       // 2. Processar cada mensagem
       for (const msg of messages) {
@@ -68,18 +68,9 @@ serve(async (req) => {
           break;
         }
 
-        console.log(`Processando mensagem ID: ${msg.msg_id}, Payload:`, msg.payload);
+        console.log(`Processando mensagem ID: ${msg.message_id}, Telefone: ${msg.phone}`);
         
-        // Verificar se a mensagem está agendada para o futuro
-        const scheduledFor = new Date(msg.payload.scheduled_for);
-        const now = new Date();
-        
-        if (now < scheduledFor) {
-          console.log(`Mensagem agendada para ${scheduledFor} pulada (ainda não é hora)`);
-          continue; // Pula esta mensagem, será processada mais tarde
-        }
-
-        await processMessage(msg.payload, msg.msg_id, supabaseClient, EVOLUTION_API_URL, EVOLUTION_API_KEY);
+        await processMessage(msg, supabaseClient, EVOLUTION_API_URL, EVOLUTION_API_KEY);
         totalProcessed++;
       }
     }
@@ -98,65 +89,36 @@ serve(async (req) => {
   }
 });
 
-async function processMessage(payload: any, msg_id: bigint, supabase: any, apiUrl: string, apiKey: string) {
-  const { campaign_id, contact_id, user_id, instance_id } = payload;
+async function processMessage(msg: any, supabase: any, apiUrl: string, apiKey: string) {
+  const { message_id, campaign_id, contact_id, user_id, phone, message, media_url, instance_name } = msg;
   console.log(`Processando mensagem para campanha ${campaign_id}, contato ${contact_id}`);
 
   let finalStatus = 'failed';
   let responseData: any = { error: 'Unknown error' };
-  let campaignData: any, contactData: any;
+  let contactName: string | null = null;
 
   try {
-    // 1. Obter detalhes
-    const { data: cData, error: cError } = await supabase
-      .from('campaigns')
-      .select('message, media_url, interval_config, sending_method')
-      .eq('id', campaign_id)
-      .single();
-    
-    if (cError) throw new Error(`Campaign not found: ${cError.message}`);
-    campaignData = cData;
-
-    const { data: ctData, error: ctError } = await supabase
+    // 1. Obter nome do contato para personalização
+    const { data: contactData, error: contactError } = await supabase
       .from('contacts')
-      .select('name, phone')
+      .select('name')
       .eq('id', contact_id)
       .single();
     
-    if (ctError) throw new Error(`Contact not found: ${ctError.message}`);
-    contactData = ctData;
-    
-    const { data: iData, error: iError } = await supabase
-      .from('instances')
-      .select('instance_name')
-      .eq('id', instance_id)
-      .single();
-    
-    if (iError) throw new Error(`Instance not found: ${iError.message}`);
+    if (contactError) console.warn(`Could not fetch contact name for ${contact_id}: ${contactError.message}`);
+    contactName = contactData?.name || null;
 
-    // 2. Calcular e aplicar atraso (se for método avançado)
-    let delaySeconds = 5; // Padrão
-    if (campaignData.sending_method === 'queue' && campaignData.interval_config) {
-      const intervals = campaignData.interval_config;
-      const randomInterval = intervals[Math.floor(Math.random() * intervals.length)];
-      delaySeconds = Math.random() * (randomInterval.max - randomInterval.min) + randomInterval.min;
-      console.log(`Atraso aleatório: ${delaySeconds.toFixed(2)} segundos`);
-    }
-    
-    console.log(`Aguardando ${delaySeconds.toFixed(2)} segundos...`);
-    await new Promise(resolve => setTimeout(resolve, delaySeconds * 1000));
-
-    // 3. Decrementar créditos
+    // 2. Decrementar créditos
     const { data: canSend, error: rpcError } = await supabase.rpc('decrement_user_credits', {
       user_id_param: user_id
     });
     
     if (rpcError || !canSend) throw new Error('Créditos insuficientes ou erro ao decrementar.');
 
-    // 4. Enviar mensagem
-    const personalizedMessage = campaignData.message
-      .replace(/{{nome}}/g, contactData.name || '')
-      .replace(/{{telefone}}/g, contactData.phone || '');
+    // 3. Personalizar e enviar mensagem
+    const personalizedMessage = message
+      .replace(/{{nome}}/g, contactName || '')
+      .replace(/{{telefone}}/g, phone || '');
     
     const headers = {
       'Content-Type': 'application/json',
@@ -164,13 +126,13 @@ async function processMessage(payload: any, msg_id: bigint, supabase: any, apiUr
     };
     
     let response;
-    if (campaignData.media_url) {
-      const url = `${apiUrl}/message/sendMedia/${iData.instance_name}`;
+    if (media_url) {
+      const url = `${apiUrl}/message/sendMedia/${instance_name}`;
       const body = {
-        number: contactData.phone,
+        number: phone,
         mediaMessage: {
-          mediaType: campaignData.media_url.match(/\.(mp4|mov|avi)$/i) ? 'video' : 'image',
-          url: campaignData.media_url,
+          mediaType: media_url.match(/\.(mp4|mov|avi)$/i) ? 'video' : 'image',
+          url: media_url,
           caption: personalizedMessage
         }
       };
@@ -180,9 +142,9 @@ async function processMessage(payload: any, msg_id: bigint, supabase: any, apiUr
         body: JSON.stringify(body)
       });
     } else {
-      const url = `${apiUrl}/message/sendText/${iData.instance_name}`;
+      const url = `${apiUrl}/message/sendText/${instance_name}`;
       const body = {
-        number: contactData.phone,
+        number: phone,
         text: personalizedMessage
       };
       response = await fetch(url, {
@@ -197,28 +159,29 @@ async function processMessage(payload: any, msg_id: bigint, supabase: any, apiUr
     finalStatus = 'sent';
 
   } catch (e: any) {
-    console.error(`Erro ao processar mensagem para contato ${contact_id}:`, e.message);
+    console.error(`Erro ao processar mensagem ${message_id} para contato ${contact_id}:`, e.message);
     responseData = { error: e.message };
   }
+
+  // 4. Atualizar o status final da mensagem agendada
+  await supabase
+    .from('scheduled_messages')
+    .update({ 
+      status: finalStatus, 
+      sent_at: new Date().toISOString() 
+    })
+    .eq('id', message_id);
 
   // 5. Registrar no log de mensagens
   await supabase.from('messages_log').insert({
     campaign_id,
     contact_id,
     user_id,
-    phone: contactData?.phone,
-    message: campaignData?.message,
+    phone: phone,
+    message: message,
     status: finalStatus,
     response: responseData,
+    scheduled_for: msg.scheduled_for, 
     sent_at: new Date().toISOString()
   });
-
-  // 6. Confirmar processamento da mensagem na fila
-  const { error: ackError } = await supabase.rpc('ack_message', {
-    p_msg_id: msg_id
-  });
-  
-  if (ackError) {
-    console.error(`Falha ao confirmar mensagem ${msg_id}:`, ackError.message);
-  }
 }
