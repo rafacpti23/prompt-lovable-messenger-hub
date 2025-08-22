@@ -16,7 +16,7 @@ export interface UserSubscription {
     credits: number;
     price_per_message: number;
     duration_days: number;
-    enable_queue_sending: boolean; // Adicionado
+    enable_queue_sending?: boolean; // optional
   };
 }
 
@@ -25,7 +25,7 @@ const fetchSubscription = async (userId: string): Promise<UserSubscription | nul
     .from("user_subscriptions")
     .select(`
       *,
-      plan:plans(*)
+      plan:plans(name, price, credits, price_per_message, duration_days, enable_queue_sending)
     `)
     .eq("user_id", userId)
     .eq("status", "active")
@@ -33,11 +33,15 @@ const fetchSubscription = async (userId: string): Promise<UserSubscription | nul
     .limit(1)
     .single();
 
-  // Ignore 'PGRST116' which means no rows were found, not a real error.
   if (error && error.code !== 'PGRST116') {
     throw new Error(error.message);
   }
-  
+
+  // Fix missing enable_queue_sending by adding default false if undefined
+  if (data && data.plan && (data.plan as any).enable_queue_sending === undefined) {
+    (data.plan as any).enable_queue_sending = false;
+  }
+
   return data as UserSubscription | null;
 }
 

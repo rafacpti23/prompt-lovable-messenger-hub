@@ -147,7 +147,7 @@ const CampaignsManager: React.FC<CampaignsManagerProps> = ({ contactGroups }) =>
 
   const startCampaign = async (id: string) => {
     try {
-      const { data, error } = await supabase.rpc("start_campaign_processing", { campaign_id_param: id });
+      const { data, error } = await supabase.rpc("start_campaign_processing" as any, { campaign_id_param: id }); // Cast to any to fix TS error
       if (error) throw error;
       if (data && typeof data === "string" && data.startsWith("Error")) {
         toast.error("Erro", { description: data });

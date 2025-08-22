@@ -44,7 +44,12 @@ const PlanManagement: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPlans(data || []);
+      // Fix missing enable_queue_sending by mapping data
+      const fixedData = (data || []).map((plan: any) => ({
+        ...plan,
+        enable_queue_sending: plan.enable_queue_sending ?? false,
+      }));
+      setPlans(fixedData);
     } catch (error: any) {
       toast({
         title: "Erro ao buscar planos",
@@ -82,7 +87,10 @@ const PlanManagement: React.FC = () => {
 
       if (error) throw error;
 
-      setPlans([data, ...plans]);
+      // Fix missing enable_queue_sending in new plan data
+      const fixedPlan = { ...data, enable_queue_sending: (data as any).enable_queue_sending ?? false };
+
+      setPlans([fixedPlan, ...plans]);
       setNewPlan({ name: "", price: 0, credits: 0, duration_days: 30, enable_queue_sending: false });
       
       toast({
@@ -126,6 +134,7 @@ const PlanManagement: React.FC = () => {
 
   const toggleQueueSending = async (planId: string, enabled: boolean) => {
     try {
+      // Use .update without generic to avoid type error
       const { error } = await supabase
         .from('plans')
         .update({ enable_queue_sending: enabled })
